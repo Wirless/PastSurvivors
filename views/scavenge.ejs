@@ -172,14 +172,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     locationDetails.innerHTML = `
       <div class="location-name">${location.name}</div>
       <div class="location-description">${location.description}</div>
-      <div class="location-stats">
-        <div class="location-stat">
-          <span class="stat-label">Energy Cost:</span>
-          <span class="stat-value">${location.energy_cost}</span>
-        </div>
-        <div class="location-stat">
-          <span class="stat-label">Minimum Level:</span>
-          <span class="stat-value">${location.min_level || 1}</span>
+      <div class="location-info-container">
+        <div class="location-stats">
+          <div class="location-stat">
+            <span class="stat-label">Energy Cost:</span>
+            <span class="stat-value">${location.energy_cost}</span>
+          </div>
+          <div class="location-stat">
+            <span class="stat-label">Required Level:</span>
+            <span class="stat-value">${location.min_level || 1}</span>
+          </div>
+          <div class="location-difficulty">
+            <span class="difficulty-label">Difficulty:</span>
+            <span class="difficulty-value">${getDifficultyLabel(location)}</span>
+          </div>
         </div>
       </div>
       <button class="action-button glow-button" id="start-scavenge-btn">Start Scavenging</button>
@@ -191,6 +197,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update prev/next buttons
     prevBtn.disabled = currentLocationIndex === 0;
     nextBtn.disabled = currentLocationIndex === locations.length - 1;
+  }
+  
+  // Helper function to get difficulty label based on location properties
+  function getDifficultyLabel(location) {
+    const minLevel = location.min_level || 1;
+    
+    if (minLevel >= 10) {
+      return '<span class="difficulty-extreme">Extreme</span>';
+    } else if (minLevel >= 7) {
+      return '<span class="difficulty-hard">Hard</span>';
+    } else if (minLevel >= 4) {
+      return '<span class="difficulty-medium">Medium</span>';
+    } else {
+      return '<span class="difficulty-easy">Easy</span>';
+    }
   }
   
   async function startScavenging() {
@@ -704,34 +725,104 @@ document.addEventListener('DOMContentLoaded', async () => {
   color: #aaa;
 }
 
+.location-info-container {
+  margin: 15px 0 20px;
+  background-color: rgba(30, 30, 30, 0.7);
+  border: 1px solid #333;
+  border-radius: 5px;
+  padding: 15px;
+}
+
 .location-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
 }
 
-.location-stat {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px;
-  background-color: #2a2a2a;
+.location-stat, .location-difficulty {
+  background-color: rgba(40, 40, 40, 0.7);
+  padding: 10px;
   border-radius: 4px;
+  position: relative;
+  z-index: 1;
 }
 
-.stat-label {
-  color: #888;
+.stat-label, .difficulty-label {
+  display: block;
+  font-size: 0.85em;
+  color: #aaa;
+  margin-bottom: 5px;
 }
 
-.stat-value {
-  color: #ddd;
+.stat-value, .difficulty-value {
+  font-size: 1.1em;
+  color: #fff;
   font-weight: bold;
+}
+
+.difficulty-value {
+  position: relative;
+  padding-right: 20px;
+}
+
+.difficulty-easy, .difficulty-medium, .difficulty-hard, .difficulty-extreme {
+  position: relative;
+  padding-right: 20px;
+}
+
+.difficulty-easy:after, .difficulty-medium:after, .difficulty-hard:after, .difficulty-extreme:after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.difficulty-easy {
+  color: #5aff5a;
+}
+
+.difficulty-easy:after {
+  background-color: #5aff5a;
+  box-shadow: 0 0 5px #5aff5a;
+}
+
+.difficulty-medium {
+  color: #ffff5a;
+}
+
+.difficulty-medium:after {
+  background-color: #ffff5a;
+  box-shadow: 0 0 5px #ffff5a;
+}
+
+.difficulty-hard {
+  color: #ff9f5a;
+}
+
+.difficulty-hard:after {
+  background-color: #ff9f5a;
+  box-shadow: 0 0 5px #ff9f5a;
+}
+
+.difficulty-extreme {
+  color: #ff5a5a;
+}
+
+.difficulty-extreme:after {
+  background-color: #ff5a5a;
+  box-shadow: 0 0 5px #ff5a5a;
 }
 
 .active-scavenge-section {
   background-color: #222;
   padding: 20px;
   border-radius: 8px;
+  position: relative;
+  z-index: 2;
 }
 
 .active-location-header {
@@ -895,7 +986,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   gap: 15px;
 }
 
-.next-event-container {
+.elapsed-time-container, .next-event-container {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -904,12 +995,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   border-radius: 5px;
   border: 1px solid #44475a;
   flex: 1;
+  position: relative;
+  z-index: 2;
 }
 
-.next-event-label {
+.elapsed-label, .next-event-label {
   color: #6272a4;
   font-size: 0.9em;
-  margin-right: 5px;
   white-space: nowrap;
 }
 
@@ -937,21 +1029,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   0% { opacity: 1; }
   50% { opacity: 0.5; }
   100% { opacity: 1; }
-}
-
-.elapsed-time-container {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.elapsed-label {
-  color: #6272a4;
-}
-
-.elapsed-value {
-  color: #f8f8f2;
-  font-weight: bold;
 }
 </style> 

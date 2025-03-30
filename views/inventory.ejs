@@ -77,7 +77,7 @@
 </div>
 
 <!-- Item tooltip template -->
-<div id="item-tooltip" class="tooltip" style="display: none;"></div>
+<div id="item-tooltip" class="tooltip" style="display: none; z-index: 9999;"></div>
 
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
@@ -247,9 +247,8 @@
       const itemElement = slot.querySelector('.item');
       
       if (itemElement) {
-        // Show tooltip on hover
+        // Show tooltip on hover - improved error handling for inventory items
         itemElement.addEventListener('mouseenter', async (e) => {
-          const itemId = itemElement.dataset.itemId;
           const inventoryId = itemElement.dataset.inventoryId;
           
           // Position tooltip near the mouse
@@ -258,17 +257,60 @@
           
           // Get item details
           try {
-            // In a real implementation, we'd fetch item details if not already available
-            // For now, let's show a placeholder tooltip
-            tooltip.innerHTML = `
-              <div class="tooltip-header">${itemElement.querySelector('img').alt}</div>
-              <div class="tooltip-content">
-                <p>Hover tooltip with item details</p>
-              </div>
-            `;
-            tooltip.style.display = 'block';
+            const res = await fetch(`/api/inventory/item/${inventoryId}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include'
+            });
+            
+            const data = await res.json();
+            
+            if (data.success) {
+              const item = data.data;
+              
+              // Ensure stats object exists
+              if (!item.stats) {
+                item.stats = {};
+              }
+              
+              // Build the tooltip content
+              tooltip.innerHTML = buildItemTooltip(item);
+              tooltip.style.display = 'block';
+            }
           } catch (err) {
-            console.error('Error fetching item details:', err);
+            console.error('Error fetching item details for tooltip:', err);
+            tooltip.innerHTML = '<div class="tooltip-header">Error</div><div class="tooltip-content">Failed to load item details</div>';
+            tooltip.style.display = 'block';
+          }
+        });
+        
+        // Update tooltip position on mousemove
+        itemElement.addEventListener('mousemove', (e) => {
+          if (tooltip.style.display === 'block') {
+            // Position tooltip relative to mouse cursor, but stay within viewport
+            const tooltipWidth = tooltip.offsetWidth;
+            const tooltipHeight = tooltip.offsetHeight;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // Calculate best position to avoid going off-screen
+            let left = e.clientX + 15;
+            let top = e.clientY + 15;
+            
+            // Adjust if tooltip would go off right edge
+            if (left + tooltipWidth > viewportWidth - 20) {
+              left = e.clientX - tooltipWidth - 15;
+            }
+            
+            // Adjust if tooltip would go off bottom edge
+            if (top + tooltipHeight > viewportHeight - 20) {
+              top = e.clientY - tooltipHeight - 15;
+            }
+            
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
           }
         });
         
@@ -289,20 +331,69 @@
       const itemElement = slot.querySelector('.equipped-item');
       
       if (itemElement) {
-        // Show tooltip on hover
-        itemElement.addEventListener('mouseenter', (e) => {
+        // Show tooltip on hover - improved error handling for equipped items
+        itemElement.addEventListener('mouseenter', async (e) => {
           // Position tooltip near the mouse
           tooltip.style.left = `${e.pageX + 10}px`;
           tooltip.style.top = `${e.pageY + 10}px`;
           
-          // Show placeholder tooltip
-          tooltip.innerHTML = `
-            <div class="tooltip-header">${itemElement.alt}</div>
-            <div class="tooltip-content">
-              <p>Equipped item details</p>
-            </div>
-          `;
-          tooltip.style.display = 'block';
+          // Get item details
+          try {
+            const res = await fetch(`/api/inventory/equipped/${slot.dataset.slot}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include'
+            });
+            
+            const data = await res.json();
+            
+            if (data.success) {
+              const item = data.data;
+              
+              // Ensure stats object exists
+              if (!item.stats) {
+                item.stats = {};
+              }
+              
+              // Build the tooltip content
+              tooltip.innerHTML = buildItemTooltip(item);
+              tooltip.style.display = 'block';
+            }
+          } catch (err) {
+            console.error('Error fetching item details for tooltip:', err);
+            tooltip.innerHTML = '<div class="tooltip-header">Error</div><div class="tooltip-content">Failed to load item details</div>';
+            tooltip.style.display = 'block';
+          }
+        });
+        
+        // Update tooltip position on mousemove
+        itemElement.addEventListener('mousemove', (e) => {
+          if (tooltip.style.display === 'block') {
+            // Position tooltip relative to mouse cursor, but stay within viewport
+            const tooltipWidth = tooltip.offsetWidth;
+            const tooltipHeight = tooltip.offsetHeight;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // Calculate best position to avoid going off-screen
+            let left = e.clientX + 15;
+            let top = e.clientY + 15;
+            
+            // Adjust if tooltip would go off right edge
+            if (left + tooltipWidth > viewportWidth - 20) {
+              left = e.clientX - tooltipWidth - 15;
+            }
+            
+            // Adjust if tooltip would go off bottom edge
+            if (top + tooltipHeight > viewportHeight - 20) {
+              top = e.clientY - tooltipHeight - 15;
+            }
+            
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+          }
         });
         
         // Hide tooltip on mouseout
@@ -318,85 +409,501 @@
     });
   }
   
-  // Show item details in the details panel
+  // Helper function to build consistent item tooltips
+  function buildItemTooltip(item) {
+    return `
+      <div class="tooltip-header">${item.name}</div>
+      <div class="tooltip-content">
+        <div class="tooltip-type">${capitalizeFirstLetter(item.type)}${item.subType ? ` (${capitalizeFirstLetter(item.subType)})` : ''}</div>
+        <div class="tooltip-rarity ${item.rarity}">${capitalizeFirstLetter(item.rarity)}</div>
+        <div class="tooltip-description">${item.description}</div>
+        
+        ${renderTooltipStats(item)}
+        
+        <div class="tooltip-meta">
+          <span>Weight: ${item.weight}</span> | <span>Value: ${item.value}</span>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Helper function to render tooltip stats based on item type
+  function renderTooltipStats(item) {
+    if (item.type === 'consumable') {
+      return `
+        <div class="tooltip-stats">
+          ${item.stats.healthBonus ? `
+            <div class="tooltip-stat ${item.stats.healthBonus > 0 ? 'positive' : 'negative'}">
+              <span class="stat-name">Health:</span>
+              <span class="stat-value">${item.stats.healthBonus > 0 ? '+' : ''}${item.stats.healthBonus}</span>
+            </div>` : ''}
+          ${item.stats.hungerRestore ? `
+            <div class="tooltip-stat positive">
+              <span class="stat-name">Hunger:</span>
+              <span class="stat-value">+${item.stats.hungerRestore}</span>
+            </div>` : ''}
+          ${item.stats.thirstRestore ? `
+            <div class="tooltip-stat positive">
+              <span class="stat-name">Thirst:</span>
+              <span class="stat-value">+${item.stats.thirstRestore}</span>
+            </div>` : ''}
+          ${item.stats.radiationEffect ? `
+            <div class="tooltip-stat ${item.stats.radiationEffect < 0 ? 'positive' : 'negative'}">
+              <span class="stat-name">Radiation:</span>
+              <span class="stat-value">${item.stats.radiationEffect > 0 ? '+' : ''}${item.stats.radiationEffect}</span>
+            </div>` : ''}
+          ${(!item.stats.healthBonus && !item.stats.hungerRestore && !item.stats.thirstRestore && !item.stats.radiationEffect) ? `
+            <div class="tooltip-stat">
+              <span class="stat-name">Effects:</span>
+              <span class="stat-value">None</span>
+            </div>` : ''}
+        </div>
+      `;
+    } else if (item.type === 'weapon') {
+      return `
+        <div class="tooltip-stats">
+          <div class="tooltip-stat">
+            <span class="stat-name">Damage:</span>
+            <span class="stat-value">${item.stats.damage || 0}</span>
+          </div>
+        </div>
+      `;
+    } else if (item.type === 'armor') {
+      return `
+        <div class="tooltip-stats">
+          <div class="tooltip-stat">
+            <span class="stat-name">Defense:</span>
+            <span class="stat-value">${item.stats.defense || 0}</span>
+          </div>
+          <div class="tooltip-stat">
+            <span class="stat-name">Rad Resistance:</span>
+            <span class="stat-value">${item.stats.radiationResistance || 0}</span>
+          </div>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="tooltip-stats">
+          <div class="tooltip-stat">
+            <span class="stat-name">Info:</span>
+            <span class="stat-value">This item has no special properties</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+  
+  // Show item details in the details panel - update to handle undefined stats
   function showItemDetails(itemId, source, slot) {
     const detailsPanel = document.getElementById('item-details');
     const actionsPanel = document.getElementById('item-actions');
     
-    // For now, show placeholder content
-    detailsPanel.innerHTML = `
-      <div class="item-detail-header">
-        <h4>Item Name</h4>
-        <div class="item-rarity">Common</div>
-      </div>
-      <div class="item-description">
-        Item description would go here. This item has various properties that affect your survivor.
-      </div>
-      <div class="item-stats">
-        <div class="item-stat">
-          <span class="stat-name">Weight:</span>
-          <span class="stat-value">1.0</span>
-        </div>
-        <div class="item-stat">
-          <span class="stat-name">Value:</span>
-          <span class="stat-value">10</span>
-        </div>
-      </div>
-    `;
-    
-    // Show appropriate actions based on item source
+    // Clear existing content
+    detailsPanel.innerHTML = '<p class="loading">Loading item details...</p>';
     actionsPanel.innerHTML = '';
     
-    if (source === 'inventory') {
-      // Actions for inventory items
-      const useButton = document.createElement('button');
-      useButton.className = 'action-button glow-button';
-      useButton.textContent = 'Use';
-      useButton.addEventListener('click', () => useItem(itemId));
-      
-      const equipButton = document.createElement('button');
-      equipButton.className = 'action-button glow-button';
-      equipButton.textContent = 'Equip';
-      equipButton.addEventListener('click', () => equipItem(itemId));
-      
-      const dropButton = document.createElement('button');
-      dropButton.className = 'action-button glow-button danger-button';
-      dropButton.textContent = 'Drop';
-      dropButton.addEventListener('click', () => dropItem(itemId));
-      
-      actionsPanel.appendChild(useButton);
-      actionsPanel.appendChild(equipButton);
-      actionsPanel.appendChild(dropButton);
-    } else if (source === 'equipment') {
-      // Actions for equipped items
-      const unequipButton = document.createElement('button');
-      unequipButton.className = 'action-button glow-button';
-      unequipButton.textContent = 'Unequip';
-      unequipButton.addEventListener('click', () => unequipItem(slot));
-      
-      actionsPanel.appendChild(unequipButton);
-    }
+    // Fetch item details from the server
+    fetch(`/api/inventory/${source === 'inventory' ? 'item/' + itemId : 'equipped/' + slot}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include'
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        const item = data.data;
+        
+        // Ensure stats object exists
+        if (!item.stats) {
+          item.stats = {};
+        }
+        
+        // Build the details HTML
+        detailsPanel.innerHTML = `
+          <div class="item-detail-header">
+            <h4>${item.name}</h4>
+            <div class="item-rarity rarity-${item.rarity}">${item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}</div>
+          </div>
+          <div class="item-image-preview">
+            <img src="${item.image.startsWith('/images/items/') ? item.image : '/images/items/' + item.image}" alt="${item.name}">
+          </div>
+          <div class="item-description">
+            ${item.description}
+          </div>
+          <div class="item-stats">
+            ${renderItemStats(item)}
+          </div>
+        `;
+        
+        // Show appropriate actions based on item source and type
+        if (source === 'inventory') {
+          // Actions for inventory items
+          if (item.type === 'consumable') {
+            const useButton = document.createElement('button');
+            useButton.className = 'action-button glow-button';
+            useButton.textContent = 'Use';
+            useButton.addEventListener('click', () => useItem(itemId));
+            actionsPanel.appendChild(useButton);
+          }
+          
+          if (item.type === 'weapon' || item.type === 'armor' || item.type === 'accessory') {
+            const equipButton = document.createElement('button');
+            equipButton.className = 'action-button glow-button';
+            equipButton.textContent = 'Equip';
+            equipButton.addEventListener('click', () => equipItem(itemId));
+            actionsPanel.appendChild(equipButton);
+          }
+          
+          const dropButton = document.createElement('button');
+          dropButton.className = 'action-button glow-button danger-button';
+          dropButton.textContent = 'Drop';
+          dropButton.addEventListener('click', () => dropItem(itemId));
+          actionsPanel.appendChild(dropButton);
+        } else if (source === 'equipment') {
+          // Actions for equipped items
+          const unequipButton = document.createElement('button');
+          unequipButton.className = 'action-button glow-button';
+          unequipButton.textContent = 'Unequip';
+          unequipButton.addEventListener('click', () => unequipItem(slot));
+          actionsPanel.appendChild(unequipButton);
+        }
+      } else {
+        detailsPanel.innerHTML = `<p class="error-message">${data.message || 'Failed to load item details'}</p>`;
+      }
+    })
+    .catch(err => {
+      console.error('Error fetching item details:', err);
+      detailsPanel.innerHTML = `<p class="error-message">Error loading item details</p>`;
+    });
+  }
+  
+  // Helper function to capitalize first letter
+  function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
   }
   
   // Placeholder functions for item actions
   function useItem(inventoryItemId) {
     console.log('Using item:', inventoryItemId);
-    alert('Using item functionality will be implemented soon!');
+    
+    fetch('/api/inventory/use', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({ inventoryItemId })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        // Show a success message with effects
+        let effectsMessage = '';
+        
+        if (data.data.effects.health > 0) {
+          effectsMessage += `+${data.data.effects.health} Health. `;
+        }
+        
+        if (data.data.effects.hunger > 0) {
+          effectsMessage += `+${data.data.effects.hunger} Hunger. `;
+        }
+        
+        if (data.data.effects.thirst > 0) {
+          effectsMessage += `+${data.data.effects.thirst} Thirst. `;
+        }
+        
+        if (data.data.effects.radiation > 0) {
+          effectsMessage += `+${data.data.effects.radiation} Radiation. `;
+        } else if (data.data.effects.radiation < 0) {
+          effectsMessage += `${data.data.effects.radiation} Radiation. `;
+        }
+        
+        // Show toast with effects
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = `<div>${data.message}</div>${effectsMessage ? `<div class="toast-effects">${effectsMessage}</div>` : ''}`;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.classList.add('show');
+        }, 10);
+        
+        setTimeout(() => {
+          toast.classList.remove('show');
+          setTimeout(() => {
+            document.body.removeChild(toast);
+          }, 300);
+        }, 3000);
+        
+        // Update the inventory display
+        renderInventory({
+          inventory: data.data.inventory,
+          equipment: {}  // We don't get equipment back, but we're not changing it
+        });
+        
+        // Close the item details
+        document.getElementById('item-details').innerHTML = '<p class="no-item-selected">Select an item to view details</p>';
+        document.getElementById('item-actions').innerHTML = '';
+      } else {
+        alert(data.message || 'Failed to use item');
+      }
+    })
+    .catch(err => {
+      console.error('Error using item:', err);
+      alert('An error occurred while using the item');
+    });
   }
   
   function equipItem(inventoryItemId) {
     console.log('Equipping item:', inventoryItemId);
-    alert('Equipping item functionality will be implemented soon!');
+    
+    fetch('/api/inventory/equip', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({ inventoryItemId })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        // Show success message
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = data.message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.classList.add('show');
+        }, 10);
+        
+        setTimeout(() => {
+          toast.classList.remove('show');
+          setTimeout(() => {
+            document.body.removeChild(toast);
+          }, 300);
+        }, 3000);
+        
+        // Update the inventory and equipment display
+        if (data.data) {
+          renderInventory({
+            inventory: data.data.inventory,
+            equipment: data.data.equipment
+          });
+        }
+        
+        // Close the item details
+        document.getElementById('item-details').innerHTML = '<p class="no-item-selected">Select an item to view details</p>';
+        document.getElementById('item-actions').innerHTML = '';
+      } else {
+        alert(data.message || 'Failed to equip item');
+      }
+    })
+    .catch(err => {
+      console.error('Error equipping item:', err);
+      alert('An error occurred while equipping the item');
+    });
   }
   
   function unequipItem(slot) {
     console.log('Unequipping item from slot:', slot);
-    alert('Unequipping item functionality will be implemented soon!');
+    
+    fetch('/api/inventory/unequip', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({ slot })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        // Show success message
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = data.message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.classList.add('show');
+        }, 10);
+        
+        setTimeout(() => {
+          toast.classList.remove('show');
+          setTimeout(() => {
+            document.body.removeChild(toast);
+          }, 300);
+        }, 3000);
+        
+        // Update the inventory and equipment display
+        if (data.data) {
+          renderInventory({
+            inventory: data.data.inventory,
+            equipment: data.data.equipment
+          });
+        }
+        
+        // Close the item details
+        document.getElementById('item-details').innerHTML = '<p class="no-item-selected">Select an item to view details</p>';
+        document.getElementById('item-actions').innerHTML = '';
+      } else {
+        alert(data.message || 'Failed to unequip item');
+      }
+    })
+    .catch(err => {
+      console.error('Error unequipping item:', err);
+      alert('An error occurred while unequipping the item');
+    });
   }
   
   function dropItem(inventoryItemId) {
-    console.log('Dropping item:', inventoryItemId);
-    alert('Dropping item functionality will be implemented soon!');
+    if (confirm('Are you sure you want to drop this item? This cannot be undone.')) {
+      console.log('Dropping item:', inventoryItemId);
+      
+      fetch('/api/inventory/remove', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ inventoryItemId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          // Show success message
+          const toast = document.createElement('div');
+          toast.className = 'toast';
+          toast.textContent = data.message;
+          document.body.appendChild(toast);
+          
+          setTimeout(() => {
+            toast.classList.add('show');
+          }, 10);
+          
+          setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+              document.body.removeChild(toast);
+            }, 300);
+          }, 3000);
+          
+          // Update the inventory display
+          if (data.data) {
+            renderInventory({
+              inventory: data.data,
+              equipment: {}  // We don't get equipment back, but we're not changing it
+            });
+          }
+          
+          // Close the item details
+          document.getElementById('item-details').innerHTML = '<p class="no-item-selected">Select an item to view details</p>';
+          document.getElementById('item-actions').innerHTML = '';
+        } else {
+          alert(data.message || 'Failed to drop item');
+        }
+      })
+      .catch(err => {
+        console.error('Error dropping item:', err);
+        alert('An error occurred while dropping the item');
+      });
+    }
+  }
+  
+  // Render item stats based on item type - used for item details panel
+  function renderItemStats(item) {
+    // Make sure stats object exists to prevent errors
+    if (!item.stats) {
+      item.stats = {};
+    }
+    
+    let statsHTML = `
+      <div class="item-stat">
+        <span class="stat-name">Type:</span>
+        <span class="stat-value">${capitalizeFirstLetter(item.type)}${item.subType ? ` (${capitalizeFirstLetter(item.subType)})` : ''}</span>
+      </div>
+      <div class="item-stat">
+        <span class="stat-name">Weight:</span>
+        <span class="stat-value">${item.weight}</span>
+      </div>
+      <div class="item-stat">
+        <span class="stat-name">Value:</span>
+        <span class="stat-value">${item.value}</span>
+      </div>
+    `;
+    
+    // Add type-specific stats
+    if (item.type === 'weapon') {
+      statsHTML += `
+        <div class="item-stat">
+          <span class="stat-name">Damage:</span>
+          <span class="stat-value">${item.stats.damage || 0}</span>
+        </div>
+      `;
+    } else if (item.type === 'armor') {
+      statsHTML += `
+        <div class="item-stat">
+          <span class="stat-name">Defense:</span>
+          <span class="stat-value">${item.stats.defense || 0}</span>
+        </div>
+        <div class="item-stat">
+          <span class="stat-name">Rad Resistance:</span>
+          <span class="stat-value">${item.stats.radiationResistance || 0}</span>
+        </div>
+      `;
+    } else if (item.type === 'consumable') {
+      if (item.stats.healthBonus) {
+        statsHTML += `
+          <div class="item-stat ${item.stats.healthBonus > 0 ? 'positive' : 'negative'}">
+            <span class="stat-name">Health:</span>
+            <span class="stat-value">${item.stats.healthBonus > 0 ? '+' : ''}${item.stats.healthBonus}</span>
+          </div>
+        `;
+      }
+      
+      if (item.stats.hungerRestore) {
+        statsHTML += `
+          <div class="item-stat positive">
+            <span class="stat-name">Hunger:</span>
+            <span class="stat-value">+${item.stats.hungerRestore}</span>
+          </div>
+        `;
+      }
+      
+      if (item.stats.thirstRestore) {
+        statsHTML += `
+          <div class="item-stat positive">
+            <span class="stat-name">Thirst:</span>
+            <span class="stat-value">+${item.stats.thirstRestore}</span>
+          </div>
+        `;
+      }
+      
+      if (item.stats.radiationEffect) {
+        statsHTML += `
+          <div class="item-stat ${item.stats.radiationEffect < 0 ? 'positive' : 'negative'}">
+            <span class="stat-name">Radiation:</span>
+            <span class="stat-value">${item.stats.radiationEffect > 0 ? '+' : ''}${item.stats.radiationEffect}</span>
+          </div>
+        `;
+      }
+    }
+    
+    // If there are no specific stats, add a message
+    if (item.type === 'resource' || (statsHTML.trim() === '' && item.type !== 'consumable' && item.type !== 'weapon' && item.type !== 'armor')) {
+      statsHTML += `
+        <div class="item-stat">
+          <span class="stat-name">Info:</span>
+          <span class="stat-value">This item has no special properties</span>
+        </div>
+      `;
+    }
+    
+    return statsHTML;
   }
 </script>
 
@@ -507,6 +1014,8 @@
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 0.5rem;
+    position: relative; /* Ensure proper positioning context */
+    z-index: 1; /* Base z-index */
   }
   
   .inventory-slot {
@@ -519,6 +1028,9 @@
     justify-content: center;
     border-radius: 3px;
     position: relative;
+    z-index: 2; /* Higher than grid but lower than tooltip */
+    margin: 0; /* Remove any margin that might cause gaps */
+    padding: 0; /* Remove any padding that might cause gaps */
   }
   
   .inventory-slot .item {
@@ -529,6 +1041,7 @@
     justify-content: center;
     cursor: pointer;
     position: relative;
+    z-index: 3; /* Higher than slot but lower than tooltip */
   }
   
   .inventory-slot .item img {
@@ -616,6 +1129,11 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.5rem;
+    background-color: rgba(20, 20, 20, 0.5);
+    border-radius: 5px;
+    border: 1px solid rgba(100, 100, 100, 0.3);
   }
   
   .item-stat {
@@ -624,6 +1142,7 @@
     background-color: rgba(30, 30, 30, 0.8);
     padding: 0.5rem;
     border-radius: 3px;
+    margin-bottom: 0.25rem;
   }
   
   .stat-name {
@@ -632,6 +1151,122 @@
   
   .stat-value {
     color: var(--toxic-green);
+  }
+  
+  /* Item image preview */
+  .item-image-preview {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 5px;
+    padding: 1rem;
+  }
+  
+  .item-image-preview img {
+    max-width: 100px;
+    max-height: 100px;
+  }
+  
+  /* Positive and negative effects */
+  .item-stat.positive .stat-value {
+    color: #5aff5a;
+  }
+  
+  .item-stat.negative .stat-value {
+    color: #ff5a5a;
+  }
+  
+  /* Loading indicator */
+  .loading {
+    text-align: center;
+    color: #888;
+    padding: 1rem 0;
+  }
+  
+  /* Tooltip styles - Fix position and z-index issues */
+  .tooltip {
+    position: fixed; /* Keep as fixed for best positioning */
+    z-index: 9999; /* Highest z-index to ensure it's above everything */
+    background-color: rgba(10, 10, 10, 0.95);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 0.75rem;
+    min-width: 220px;
+    max-width: 320px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  
+  .tooltip-header {
+    color: var(--toxic-green);
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .tooltip-content {
+    font-size: 0.9rem;
+  }
+  
+  .tooltip-type {
+    font-size: 0.8rem;
+    color: #aaa;
+    margin-bottom: 0.4rem;
+  }
+  
+  .tooltip-rarity {
+    display: inline-block;
+    font-size: 0.8rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    margin-bottom: 0.5rem;
+  }
+  
+  .tooltip-description {
+    font-size: 0.8rem;
+    line-height: 1.3;
+    color: #ccc;
+    margin-bottom: 0.6rem;
+  }
+  
+  .tooltip-stats {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.3rem;
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    border-top: 1px solid rgba(100, 100, 100, 0.3);
+    border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+    background-color: rgba(20, 20, 20, 0.5);
+    border-radius: 3px;
+  }
+  
+  .tooltip-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.15rem 0.3rem;
+    border-radius: 2px;
+    background-color: rgba(40, 40, 40, 0.5);
+  }
+  
+  .tooltip-stat.positive .stat-value {
+    color: #5aff5a;
+  }
+  
+  .tooltip-stat.negative .stat-value {
+    color: #ff5a5a;
+  }
+  
+  .tooltip-meta {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(100, 100, 100, 0.3);
+    font-size: 0.75rem;
+    color: #999;
+    text-align: center;
   }
   
   /* Item actions */
@@ -650,32 +1285,6 @@
   .danger-button:hover {
     box-shadow: 0 0 15px rgba(255, 51, 51, 0.7);
     background-color: rgba(255, 51, 51, 0.1);
-  }
-  
-  /* Tooltip */
-  .tooltip {
-    position: absolute;
-    z-index: 100;
-    background-color: rgba(10, 10, 10, 0.9);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    padding: 0.5rem;
-    min-width: 200px;
-    max-width: 300px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    pointer-events: none;
-  }
-  
-  .tooltip-header {
-    color: var(--toxic-green);
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  .tooltip-content {
-    font-size: 0.9rem;
   }
   
   /* Footer */
@@ -742,5 +1351,34 @@
     color: #ff5722;
     text-align: center;
     padding: 20px;
+  }
+  
+  /* Toast notifications */
+  .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(10, 10, 10, 0.9);
+    color: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 4px solid var(--toxic-green);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    max-width: 300px;
+    opacity: 0;
+    transform: translateX(50px);
+    transition: all 0.3s ease;
+  }
+  
+  .toast.show {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  
+  .toast-effects {
+    margin-top: 5px;
+    font-size: 0.9rem;
+    color: #aaa;
   }
 </style> 

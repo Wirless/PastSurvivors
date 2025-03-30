@@ -572,7 +572,27 @@ async function processScavengeEvent(req, location, elapsedSeconds) {
         "You feel like you're being watched, but see no one.",
         "The silence is deafening as you continue to search.",
         "You find some discarded trash, but nothing useful.",
-        "The air is thick with dust and radiation."
+        "The air is thick with dust and radiation.",
+        "A sudden gust of wind sends debris skittering across the ground.",
+        "The distant sound of metal creaking echoes through the ruins.",
+        "You spot movement in the shadows, but when you look closer, there's nothing there.",
+        "A strange smell lingers in the air, sharp and metallic.",
+        "You step on something brittle, and it crumbles to dust beneath your foot.",
+        "A low, distant rumble vibrates through the ground, but the source is unclear.",
+        "A flicker of light catches your eye, but it vanishes when you focus on it.",
+        "You find a faded sign warning of dangers long forgotten.",
+        "A single drop of water falls from above, breaking the eerie silence.",
+        "The wind carries a faint whisper, but you can't make out any words.",
+        "You stumble upon an old, rusted weapon, completely useless now.",
+        "A shiver runs down your spine, but you can't explain why.",
+        "The ruins seem unnaturally still, as if waiting for something to happen.",
+        "A distant, muffled explosion echoes across the wasteland.",
+        "You find an old, torn piece of fabric caught on a jagged piece of metal.",
+        "A weak radio signal crackles briefly in the static before vanishing.",
+        "You hear a faint tapping sound, rhythmic and unnatural.",
+        "The ground shifts slightly beneath your feet, unsettling but stable.",
+        "You notice strange markings on a nearby wall, their meaning unknown.",
+        "The remains of a long-dead fire suggest someone was here not too long ago."
       ];
       
       // Select a random ambient event

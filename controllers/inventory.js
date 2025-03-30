@@ -359,6 +359,114 @@ exports.unequipItem = async (req, res) => {
   }
 };
 
+// @desc    Get item details by inventory ID
+// @route   GET /api/inventory/item/:id
+// @access  Private
+exports.getItemById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find character
+    const character = await Character.findOne({ user: req.user.id });
+
+    if (!character) {
+      return res.status(404).json({
+        success: false,
+        message: 'Character not found'
+      });
+    }
+
+    // Find item in inventory
+    const inventoryItem = character.inventory.find(
+      item => item._id.toString() === id
+    );
+
+    if (!inventoryItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item not found in inventory'
+      });
+    }
+
+    // Get full item details
+    const item = await Item.findById(inventoryItem.item);
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item details not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: item
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
+// @desc    Get equipped item details by slot
+// @route   GET /api/inventory/equipped/:slot
+// @access  Private
+exports.getEquippedItemBySlot = async (req, res) => {
+  try {
+    const { slot } = req.params;
+
+    // Validate slot
+    if (!['head', 'body', 'hands', 'legs', 'feet', 'weapon', 'accessory'].includes(slot)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid equipment slot'
+      });
+    }
+
+    // Find character
+    const character = await Character.findOne({ user: req.user.id });
+
+    if (!character) {
+      return res.status(404).json({
+        success: false,
+        message: 'Character not found'
+      });
+    }
+
+    // Check if an item is equipped in that slot
+    if (!character.equipment[slot]) {
+      return res.status(404).json({
+        success: false,
+        message: 'No item equipped in this slot'
+      });
+    }
+
+    // Get full item details
+    const item = await Item.findById(character.equipment[slot]);
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item details not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: item
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
 // @desc    Use consumable item
 // @route   POST /api/inventory/use
 // @access  Private
@@ -415,32 +523,64 @@ exports.useItem = async (req, res) => {
       radiation: 0
     };
 
-    // Apply health restoration
-    if (item.stats.healthBonus > 0) {
-      const newHealth = Math.min(character.health.current + item.stats.healthBonus, character.health.max);
+    // Special handling for specific items
+    if (item.itemId === 'rat_meat') {
+      // Rat meat: +5 health, +1 radiation
+      const newHealth = Math.min(character.health.current + 5, character.health.max);
+      effects.health = newHealth - character.health.current;
+      character.health.current = newHealth;
+      
+      character.radiation = Math.min(character.radiation + 1, 100);
+      effects.radiation = 1;
+    } 
+    else if (item.itemId === 'dirty_water') {
+      // Dirty water: +10 thirst, +2 radiation
+      const newThirst = Math.min(character.thirst + 10, 100);
+      effects.thirst = newThirst - character.thirst;
+      character.thirst = newThirst;
+      
+      character.radiation = Math.min(character.radiation + 2, 100);
+      effects.radiation = 2;
+    }
+    else if (item.itemId === 'clean_water') {
+      // Clean water: +20 thirst, +5 health, 0 radiation
+      const newThirst = Math.min(character.thirst + 20, 100);
+      effects.thirst = newThirst - character.thirst;
+      character.thirst = newThirst;
+      
+      const newHealth = Math.min(character.health.current + 5, character.health.max);
       effects.health = newHealth - character.health.current;
       character.health.current = newHealth;
     }
+    else {
+      // Apply standard effects from item stats
+      // Apply health restoration
+      if (item.stats.healthBonus > 0) {
+        const newHealth = Math.min(character.health.current + item.stats.healthBonus, character.health.max);
+        effects.health = newHealth - character.health.current;
+        character.health.current = newHealth;
+      }
 
-    // Apply hunger restoration
-    if (item.stats.hungerRestore > 0) {
-      const newHunger = Math.min(character.hunger + item.stats.hungerRestore, 100);
-      effects.hunger = newHunger - character.hunger;
-      character.hunger = newHunger;
-    }
+      // Apply hunger restoration
+      if (item.stats.hungerRestore > 0) {
+        const newHunger = Math.min(character.hunger + item.stats.hungerRestore, 100);
+        effects.hunger = newHunger - character.hunger;
+        character.hunger = newHunger;
+      }
 
-    // Apply thirst restoration
-    if (item.stats.thirstRestore > 0) {
-      const newThirst = Math.min(character.thirst + item.stats.thirstRestore, 100);
-      effects.thirst = newThirst - character.thirst;
-      character.thirst = newThirst;
-    }
+      // Apply thirst restoration
+      if (item.stats.thirstRestore > 0) {
+        const newThirst = Math.min(character.thirst + item.stats.thirstRestore, 100);
+        effects.thirst = newThirst - character.thirst;
+        character.thirst = newThirst;
+      }
 
-    // Apply radiation effect (positive or negative)
-    if (item.stats.radiationEffect !== 0) {
-      const newRadiation = Math.max(0, Math.min(character.radiation - item.stats.radiationEffect, 100));
-      effects.radiation = character.radiation - newRadiation;
-      character.radiation = newRadiation;
+      // Apply radiation effect (positive or negative)
+      if (item.stats.radiationEffect !== 0) {
+        const newRadiation = Math.max(0, Math.min(character.radiation - item.stats.radiationEffect, 100));
+        effects.radiation = character.radiation - newRadiation;
+        character.radiation = newRadiation;
+      }
     }
 
     // Remove item from inventory
