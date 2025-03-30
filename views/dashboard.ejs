@@ -72,6 +72,7 @@
         <button class="action-button glow-button" id="rest-btn">Rest</button>
         <button class="action-button glow-button" id="explore-btn">Explore</button>
         <a href="/inventory" class="action-button glow-button">Inventory</a>
+        <button class="action-button debug-button" id="debug-btn" style="background-color: #333; font-size: 12px; margin-top: 15px;">Debug Auth</button>
       </div>
     </div>
 
@@ -86,12 +87,62 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
+    // Add debug functionality
+    document.getElementById('debug-btn').addEventListener('click', async () => {
+      try {
+        // Check auth token in cookies
+        const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+          const [key, value] = cookie.trim().split('=');
+          acc[key] = value;
+          return acc;
+        }, {});
+        
+        const hasToken = !!cookies.token;
+        
+        // Try to fetch user data
+        const authRes = await fetch('/api/auth/me', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+        
+        const authStatus = authRes.ok ? 'Authenticated' : 'Not authenticated';
+        const statusCode = authRes.status;
+        
+        // Try to fetch inventory data
+        const invRes = await fetch('/api/inventory', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+        
+        const invStatusCode = invRes.status;
+        const invStatus = invRes.ok ? 'Success' : 'Failed';
+        
+        // Show debug info
+        alert(`Auth debug info:
+- Token in cookies: ${hasToken ? 'Yes' : 'No'}
+- Auth status: ${authStatus} (${statusCode})
+- Inventory API: ${invStatus} (${invStatusCode})
+        
+Try going to the inventory page again now.`);
+        
+      } catch (err) {
+        alert(`Error checking auth: ${err.message}`);
+      }
+    });
+    
     try {
       const res = await fetch('/api/character', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include'
       });
       
       const data = await res.json();

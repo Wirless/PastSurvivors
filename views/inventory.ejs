@@ -81,39 +81,80 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
+    // Add debug info container
+    const debugInfo = document.createElement('div');
+    debugInfo.id = 'debug-info';
+    debugInfo.style.display = 'none';
+    debugInfo.innerHTML = '<h3>Debug Information</h3><div id="debug-content"></div>';
+    document.querySelector('.inventory-container').appendChild(debugInfo);
+    
+    const addDebugInfo = (message) => {
+      const debugContent = document.getElementById('debug-content');
+      debugContent.innerHTML += `<p>${message}</p>`;
+    };
+    
+    // Check authentication
+    addDebugInfo('Checking authentication...');
+    
     // Get character data and inventory
     try {
+      addDebugInfo('Fetching character data...');
       const characterRes = await fetch('/api/character', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include' // Important: Include cookies for authentication
       });
+      
+      addDebugInfo(`Character API status: ${characterRes.status}`);
+      
+      if (!characterRes.ok) {
+        throw new Error(`Character API returned ${characterRes.status}: ${await characterRes.text()}`);
+      }
       
       const characterData = await characterRes.json();
       
       if (characterData.success) {
         // Update character name
         document.getElementById('char-name').textContent = characterData.data.name;
+        addDebugInfo(`Character found: ${characterData.data.name}`);
+      } else {
+        addDebugInfo(`Character API error: ${characterData.message}`);
       }
       
+      addDebugInfo('Fetching inventory data...');
       const inventoryRes = await fetch('/api/inventory', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include' // Important: Include cookies for authentication
       });
+      
+      addDebugInfo(`Inventory API status: ${inventoryRes.status}`);
+      
+      if (!inventoryRes.ok) {
+        throw new Error(`Inventory API returned ${inventoryRes.status}: ${await inventoryRes.text()}`);
+      }
       
       const inventoryData = await inventoryRes.json();
       
       if (inventoryData.success) {
         // Render inventory
+        addDebugInfo('Inventory data loaded successfully');
         renderInventory(inventoryData.data);
       } else {
-        console.error('Failed to load inventory data');
+        addDebugInfo(`Inventory API error: ${inventoryData.message}`);
+        document.getElementById('inventory-grid').innerHTML = '<p class="error-message">Failed to load inventory. Please try refreshing the page.</p>';
       }
     } catch (err) {
       console.error('Error loading data:', err);
+      addDebugInfo(`Error: ${err.message}`);
+      document.getElementById('inventory-grid').innerHTML = '<p class="error-message">Error loading inventory: ' + err.message + '</p>';
+      
+      // Show debug info when there's an error
+      document.getElementById('debug-info').style.display = 'block';
     }
   });
   
@@ -670,5 +711,27 @@
         "feet weapon"
         "accessory .";
     }
+  }
+  
+  #debug-info {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #333;
+    border: 1px solid #666;
+    border-radius: 5px;
+  }
+  #debug-info h3 {
+    color: #ff5722;
+    margin-top: 0;
+  }
+  #debug-content p {
+    margin: 5px 0;
+    font-family: monospace;
+    font-size: 12px;
+  }
+  .error-message {
+    color: #ff5722;
+    text-align: center;
+    padding: 20px;
   }
 </style> 
