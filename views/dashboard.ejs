@@ -1,0 +1,105 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h2 class="glitch-text">Survivor Dashboard</h2>
+    <p class="subtitle" id="char-name">Loading character data...</p>
+  </div>
+
+  <div class="dashboard-sections">
+    <div class="dashboard-section stats-section">
+      <h3>Character Stats</h3>
+      <div class="stats-display">
+        <div class="stat-bar-container">
+          <div class="stat-label">Health</div>
+          <div class="stat-bar-wrapper">
+            <div class="stat-bar health-bar" id="health-bar"></div>
+            <div class="stat-value" id="health-value">--/--</div>
+          </div>
+        </div>
+
+        <div class="stat-bar-container">
+          <div class="stat-label">Radiation</div>
+          <div class="stat-bar-wrapper">
+            <div class="stat-bar radiation-bar" id="radiation-bar"></div>
+            <div class="stat-value" id="radiation-value">--%</div>
+          </div>
+        </div>
+
+        <div class="attribute-grid">
+          <div class="attribute">
+            <span class="attribute-label">STR:</span>
+            <span class="attribute-value" id="str-value">--</span>
+          </div>
+          <div class="attribute">
+            <span class="attribute-label">AGI:</span>
+            <span class="attribute-value" id="agi-value">--</span>
+          </div>
+          <div class="attribute">
+            <span class="attribute-label">END:</span>
+            <span class="attribute-value" id="end-value">--</span>
+          </div>
+          <div class="attribute">
+            <span class="attribute-label">INT:</span>
+            <span class="attribute-value" id="int-value">--</span>
+          </div>
+          <div class="attribute">
+            <span class="attribute-label">LCK:</span>
+            <span class="attribute-value" id="lck-value">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-section actions-section">
+      <h3>Actions</h3>
+      <div class="action-buttons">
+        <button class="action-button glow-button">Scavenge</button>
+        <button class="action-button glow-button">Rest</button>
+        <button class="action-button glow-button">Explore</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const res = await fetch('/api/character', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        const character = data.data;
+        
+        // Update character name
+        document.getElementById('char-name').textContent = character.name;
+        
+        // Update health bar
+        const healthBar = document.getElementById('health-bar');
+        const healthPercentage = (character.health.current / character.health.max) * 100;
+        healthBar.style.width = `${healthPercentage}%`;
+        document.getElementById('health-value').textContent = `${character.health.current}/${character.health.max}`;
+        
+        // Update radiation bar
+        const radiationBar = document.getElementById('radiation-bar');
+        radiationBar.style.width = `${character.radiation}%`;
+        document.getElementById('radiation-value').textContent = `${character.radiation}%`;
+        
+        // Update attributes
+        document.getElementById('str-value').textContent = character.stats.strength;
+        document.getElementById('agi-value').textContent = character.stats.agility;
+        document.getElementById('end-value').textContent = character.stats.endurance;
+        document.getElementById('int-value').textContent = character.stats.intelligence;
+        document.getElementById('lck-value').textContent = character.stats.luck;
+      } else {
+        console.error('Failed to load character data');
+      }
+    } catch (err) {
+      console.error('Error loading character data:', err);
+    }
+  });
+</script> 

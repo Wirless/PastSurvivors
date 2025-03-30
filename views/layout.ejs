@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="particles-container"></div>
+  <div id="toxic-liquid"></div>
+  
+  <div class="container">
+    <header>
+      <div class="logo">
+        <h1>POSTAPO SURVIVAL</h1>
+      </div>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <% if (typeof user !== 'undefined') { %>
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/logout">Logout</a></li>
+          <% } else { %>
+            <li><a href="/login">Login</a></li>
+            <li><a href="/register">Register</a></li>
+          <% } %>
+        </ul>
+      </nav>
+    </header>
+
+    <main>
+      <%- body %>
+    </main>
+
+    <footer>
+      <p>&copy; <%= new Date().getFullYear() %> Postapo Survival. All rights reserved.</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+  <script src="/js/effects.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html> 

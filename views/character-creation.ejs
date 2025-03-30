@@ -1,0 +1,163 @@
+<div class="character-creation-container">
+  <div class="character-box">
+    <h2 class="glitch-text">Create Your Survivor</h2>
+    <p class="subtitle">Distribute 25 points among your attributes</p>
+    
+    <form id="character-form" class="character-form">
+      <div class="form-group">
+        <label for="name">Survivor Name</label>
+        <input type="text" id="name" name="name" class="form-control" required>
+      </div>
+
+      <div class="stats-container">
+        <div class="stat-group">
+          <label for="strength">Strength</label>
+          <div class="stat-controls">
+            <button type="button" class="decrease-stat" data-stat="strength">-</button>
+            <input type="number" id="strength" name="strength" class="stat-input" value="5" min="1" max="10" readonly>
+            <button type="button" class="increase-stat" data-stat="strength">+</button>
+          </div>
+          <div class="stat-description">Impacts carrying capacity and melee damage</div>
+        </div>
+
+        <div class="stat-group">
+          <label for="agility">Agility</label>
+          <div class="stat-controls">
+            <button type="button" class="decrease-stat" data-stat="agility">-</button>
+            <input type="number" id="agility" name="agility" class="stat-input" value="5" min="1" max="10" readonly>
+            <button type="button" class="increase-stat" data-stat="agility">+</button>
+          </div>
+          <div class="stat-description">Improves chances to avoid danger</div>
+        </div>
+
+        <div class="stat-group">
+          <label for="endurance">Endurance</label>
+          <div class="stat-controls">
+            <button type="button" class="decrease-stat" data-stat="endurance">-</button>
+            <input type="number" id="endurance" name="endurance" class="stat-input" value="5" min="1" max="10" readonly>
+            <button type="button" class="increase-stat" data-stat="endurance">+</button>
+          </div>
+          <div class="stat-description">Determines health and radiation resistance</div>
+        </div>
+
+        <div class="stat-group">
+          <label for="intelligence">Intelligence</label>
+          <div class="stat-controls">
+            <button type="button" class="decrease-stat" data-stat="intelligence">-</button>
+            <input type="number" id="intelligence" name="intelligence" class="stat-input" value="5" min="1" max="10" readonly>
+            <button type="button" class="increase-stat" data-stat="intelligence">+</button>
+          </div>
+          <div class="stat-description">Unlocks better crafting and trading options</div>
+        </div>
+
+        <div class="stat-group">
+          <label for="luck">Luck</label>
+          <div class="stat-controls">
+            <button type="button" class="decrease-stat" data-stat="luck">-</button>
+            <input type="number" id="luck" name="luck" class="stat-input" value="5" min="1" max="10" readonly>
+            <button type="button" class="increase-stat" data-stat="luck">+</button>
+          </div>
+          <div class="stat-description">Increases chance of favorable outcomes</div>
+        </div>
+
+        <div class="stat-points">
+          <span>Remaining Points: </span>
+          <span id="remaining-points">0</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <button type="submit" class="btn btn-primary glow-button" id="create-character-btn" disabled>Create Survivor</button>
+      </div>
+      <div id="error-message" class="error-message"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const stats = {
+      strength: 5,
+      agility: 5,
+      endurance: 5,
+      intelligence: 5,
+      luck: 5
+    };
+    
+    const maxPoints = 25;
+    let usedPoints = 25; // 5 points in each stat initially
+    let remainingPoints = 0;
+    
+    const updateRemainingPoints = () => {
+      document.getElementById('remaining-points').textContent = remainingPoints;
+      document.getElementById('create-character-btn').disabled = remainingPoints !== 0;
+    };
+    
+    const decreaseButtons = document.querySelectorAll('.decrease-stat');
+    const increaseButtons = document.querySelectorAll('.increase-stat');
+    
+    decreaseButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const stat = button.dataset.stat;
+        if (stats[stat] > 1) {
+          stats[stat]--;
+          usedPoints--;
+          remainingPoints = maxPoints - usedPoints;
+          document.getElementById(stat).value = stats[stat];
+          updateRemainingPoints();
+        }
+      });
+    });
+    
+    increaseButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const stat = button.dataset.stat;
+        if (stats[stat] < 10 && remainingPoints > 0) {
+          stats[stat]++;
+          usedPoints++;
+          remainingPoints = maxPoints - usedPoints;
+          document.getElementById(stat).value = stats[stat];
+          updateRemainingPoints();
+        }
+      });
+    });
+    
+    document.getElementById('character-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('name').value;
+      const errorMessage = document.getElementById('error-message');
+      
+      if (!name) {
+        errorMessage.textContent = 'Please enter a survivor name';
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/character', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name,
+            stats
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          window.location.href = '/dashboard';
+        } else {
+          errorMessage.textContent = data.message || 'Failed to create character. Please try again.';
+        }
+      } catch (err) {
+        errorMessage.textContent = 'Something went wrong. Please try again.';
+        console.error(err);
+      }
+    });
+    
+    updateRemainingPoints();
+  });
+</script> 
