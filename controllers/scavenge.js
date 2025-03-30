@@ -60,6 +60,21 @@ exports.startScavenge = asyncHandler(async (req, res) => {
       });
     }
     
+    // Check if character is in recovery mode
+    if (character.isRecovering) {
+      const recoveryEnds = new Date(character.recoveryUntil);
+      const minutesLeft = Math.ceil((recoveryEnds - new Date()) / (1000 * 60));
+      
+      return res.status(400).json({
+        success: false,
+        message: `You are still recovering from injuries. Recovery ends in ${minutesLeft} minutes.`,
+        recovery: {
+          until: character.recoveryUntil,
+          minutesLeft
+        }
+      });
+    }
+    
     // Check if character has enough energy
     if (character.energy.current < location.energy_cost) {
       return res.status(400).json({
@@ -86,7 +101,9 @@ exports.startScavenge = asyncHandler(async (req, res) => {
       }],
       loot: [],
       nextEventTime: Math.floor(initialEventDelay), // Next event time in seconds from start
-      lastProcessedTime: 0
+      lastProcessedTime: 0,
+      currentCombat: null,
+      shouldEnd: false
     };
     
     // Log the initial event time
@@ -158,7 +175,7 @@ exports.endScavenge = asyncHandler(async (req, res) => {
               _id: item._id,
               name: item.name,
               quantity: lootItem.quantity || 1,
-              image: item.image.startsWith('/images/items/') ? item.image : `/images/items/${item.image}`
+              image: item.image ? (item.image.startsWith('/images/items/') ? item.image : `/images/items/${item.image}`) : '/images/items/default-item.png'
             });
           } else {
             // Check if inventory has space
@@ -173,7 +190,7 @@ exports.endScavenge = asyncHandler(async (req, res) => {
                 _id: item._id,
                 name: item.name,
                 quantity: lootItem.quantity || 1,
-                image: item.image.startsWith('/images/items/') ? item.image : `/images/items/${item.image}`
+                image: item.image ? (item.image.startsWith('/images/items/') ? item.image : `/images/items/${item.image}`) : '/images/items/default-item.png'
               });
             } else {
               // Inventory is full
@@ -193,16 +210,26 @@ exports.endScavenge = asyncHandler(async (req, res) => {
           console.warn(`Item with ID ${lootItem.item_id} not found in database when ending scavenge`);
         }
       }
-      
-      await character.save();
     }
     
     // Get total experience gained
     const experienceGained = req.session.scavenging.experienceGained || 0;
     if (experienceGained > 0) {
       character.experience += experienceGained;
-      await character.save();
     }
+    
+    // Track if character died during scavenging
+    const isRecovering = character.isRecovering;
+    
+    // If recovery just started during this session, leave health at 1
+    // Otherwise if coming out of recovery, set health to 25
+    if (character.recoveryUntil && !isRecovering) {
+      // Recovery period has ended, set health to 25
+      character.health.current = 25;
+      character.recoveryUntil = null;
+    }
+    
+    await character.save();
     
     // Compile results
     const results = {
@@ -211,7 +238,9 @@ exports.endScavenge = asyncHandler(async (req, res) => {
       loot: req.session.scavenging.loot,
       itemsAdded,
       itemsNotAdded,
-      experienceGained
+      experienceGained,
+      isRecovering: character.isRecovering,
+      recoveryUntil: character.recoveryUntil
     };
     
     // Clear scavenging session
@@ -225,7 +254,9 @@ exports.endScavenge = asyncHandler(async (req, res) => {
         character: {
           energy: character.energy,
           experience: character.experience,
-          health: character.health
+          health: character.health,
+          isRecovering: character.isRecovering,
+          recoveryUntil: character.recoveryUntil
         }
       }
     });
@@ -253,6 +284,9 @@ exports.getScavengeStatus = asyncHandler(async (req, res) => {
       });
     }
     
+    // Get character
+    const character = await Character.findOne({ user: req.user.id });
+    
     // Read locations from JSON file to get current location data
     const locationsPath = path.join(__dirname, '../public/js/scavenge_locations.json');
     const locationsData = fs.readFileSync(locationsPath, 'utf8');
@@ -268,6 +302,13 @@ exports.getScavengeStatus = asyncHandler(async (req, res) => {
         success: false,
         message: 'Scavenge location not found'
       });
+    }
+    
+    // Check if session should end (due to recovery or other reasons)
+    if (req.session.scavenging.shouldEnd || (character && character.isRecovering)) {
+      // Auto-end the session
+      await endScavenge(req, res);
+      return;
     }
     
     // Get the elapsed time in seconds
@@ -315,7 +356,9 @@ exports.getScavengeStatus = asyncHandler(async (req, res) => {
         elapsedTime: Date.now() - startTime,
         logs: req.session.scavenging.logs,
         loot: req.session.scavenging.loot || [],
-        nextEventIn: secondsUntilNextEvent
+        nextEventIn: secondsUntilNextEvent,
+        currentCombat: req.session.scavenging.currentCombat,
+        characterHealth: character ? character.health : null
       }
     });
   } catch (error) {
@@ -359,6 +402,13 @@ async function processScavengeEvent(req, location, elapsedSeconds) {
       req.session.scavenging.loot = [];
     }
     
+    // Check if there's an active combat
+    if (req.session.scavenging.currentCombat) {
+      // Process combat round
+      await processCombatRound(req, character);
+      return;
+    }
+    
     // Determine what happens in this event
     const roll = Math.random() * 100; // Random roll between 0-100
     
@@ -386,129 +436,20 @@ async function processScavengeEvent(req, location, elapsedSeconds) {
             message: `[${timeString}] You encountered a ${monster.name}!`
           });
           
-          // Simple combat resolution
-          const playerDamage = Math.floor(Math.random() * 3) + character.stats.strength - 3;
+          // Start combat
+          req.session.scavenging.currentCombat = {
+            monster: {
+              ...monster,
+              currentHealth: monster.health
+            },
+            rounds: 0,
+            lastRound: Date.now(),
+            playerDamage: 0,
+            monsterDamage: 0
+          };
           
-          // Player attacks first based on agility
-          let monsterDefeated = false;
-          let monsterHealth = monster.health;
-          
-          if (character.stats.agility >= 5) {
-            // Player gets first attack
-            monsterHealth -= Math.max(1, playerDamage);
-            
-            if (monsterHealth <= 0) {
-              monsterDefeated = true;
-              req.session.scavenging.logs.push({
-                time: Date.now(),
-                message: `You quickly defeated the ${monster.name} before it could attack!`
-              });
-            } else {
-              req.session.scavenging.logs.push({
-                time: Date.now(),
-                message: `You hit the ${monster.name} for ${Math.max(1, playerDamage)} damage.`
-              });
-            }
-          }
-          
-          // Monster attack if still alive
-          if (!monsterDefeated) {
-            const monsterDamage = Math.max(0, monster.damage);
-            
-            if (monsterDamage > 0) {
-              character.health.current -= monsterDamage;
-              req.session.scavenging.logs.push({
-                time: Date.now(),
-                message: `The ${monster.name} attacks you for ${monsterDamage} damage!`
-              });
-              
-              // Check if player died
-              if (character.health.current <= 0) {
-                character.health.current = 1; // Don't let player die, just knock them out
-                req.session.scavenging.logs.push({
-                  time: Date.now(),
-                  message: `You were knocked unconscious! You wake up with 1 health.`
-                });
-                
-                // End scavenging session after this event
-                req.session.scavenging.logs.push({
-                  time: Date.now(),
-                  message: `You decide to head back to safety.`
-                });
-                
-                await character.save();
-                return; // End processing here
-              }
-            } else {
-              req.session.scavenging.logs.push({
-                time: Date.now(),
-                message: `The ${monster.name} tries to attack but misses!`
-              });
-            }
-            
-            // Player's second attack if monster still alive
-            monsterHealth -= Math.max(1, playerDamage);
-            
-            if (monsterHealth <= 0) {
-              monsterDefeated = true;
-              req.session.scavenging.logs.push({
-                time: Date.now(),
-                message: `You defeated the ${monster.name}!`
-              });
-            } else {
-              req.session.scavenging.logs.push({
-                time: Date.now(),
-                message: `You hit the ${monster.name} for ${Math.max(1, playerDamage)} damage but it's still fighting!`
-              });
-            }
-          }
-          
-          // Rewards if monster defeated
-          if (monsterDefeated) {
-            // Experience gain
-            character.experience += monster.experience;
-            req.session.scavenging.experienceGained += monster.experience;
-            req.session.scavenging.logs.push({
-              time: Date.now(),
-              message: `You gained ${monster.experience} experience!`
-            });
-            
-            // Loot drop 
-            if (monster.loot && monster.loot.length > 0) {
-              for (const lootItem of monster.loot) {
-                const lootRoll = Math.random() * 100;
-                
-                if (lootRoll <= lootItem.chance) {
-                  // Verify the item exists in the database
-                  const itemExists = await Item.findOne({ itemId: lootItem.item_id });
-                  
-                  if (itemExists) {
-                    req.session.scavenging.logs.push({
-                      time: Date.now(),
-                      message: `You found ${itemExists.name}!`
-                    });
-                    
-                    // Add to loot
-                    const existingLoot = req.session.scavenging.loot.find(
-                      item => item.item_id === lootItem.item_id
-                    );
-                    
-                    if (existingLoot) {
-                      existingLoot.quantity = (existingLoot.quantity || 1) + 1;
-                    } else {
-                      req.session.scavenging.loot.push({
-                        item_id: lootItem.item_id,
-                        name: itemExists.name,
-                        quantity: 1
-                      });
-                    }
-                  } else {
-                    console.warn(`Item with ID ${lootItem.item_id} not found in database`);
-                  }
-                }
-              }
-            }
-          }
+          // Return early - combat will be processed in next status check
+          return;
         } else if (encounter.type === 'item') {
           // Item encounter - find some loot
           if (encounter.items && encounter.items.length > 0) {
@@ -609,6 +550,149 @@ async function processScavengeEvent(req, location, elapsedSeconds) {
     
   } catch (error) {
     console.error('Error processing scavenge event:', error);
+    throw error;
+  }
+}
+
+// Process combat round in scavenging
+async function processCombatRound(req, character) {
+  try {
+    if (!req.session.scavenging || !req.session.scavenging.currentCombat) {
+      return;
+    }
+    
+    const combat = req.session.scavenging.currentCombat;
+    const monster = combat.monster;
+    
+    // Check if enough time has passed for another round (2 seconds)
+    const now = Date.now();
+    if (now - combat.lastRound < 2000) {
+      return; // Not time for next round yet
+    }
+    
+    // Update the round counter
+    combat.rounds += 1;
+    combat.lastRound = now;
+    
+    // Calculate player damage
+    const playerDamage = Math.floor(Math.random() * 3) + character.stats.strength - 3;
+    const effectivePlayerDamage = Math.max(1, playerDamage);
+    combat.playerDamage = effectivePlayerDamage;
+    
+    // Player attacks
+    monster.currentHealth -= effectivePlayerDamage;
+    
+    req.session.scavenging.logs.push({
+      time: now,
+      message: `You hit the ${monster.name} for ${effectivePlayerDamage} damage.`
+    });
+    
+    // Check if monster is defeated
+    if (monster.currentHealth <= 0) {
+      req.session.scavenging.logs.push({
+        time: now,
+        message: `You defeated the ${monster.name}!`
+      });
+      
+      // Rewards
+      // Experience gain
+      character.experience += monster.experience;
+      req.session.scavenging.experienceGained += monster.experience;
+      req.session.scavenging.logs.push({
+        time: now,
+        message: `You gained ${monster.experience} experience!`
+      });
+      
+      // Loot drop 
+      if (monster.loot && monster.loot.length > 0) {
+        for (const lootItem of monster.loot) {
+          const lootRoll = Math.random() * 100;
+          
+          if (lootRoll <= lootItem.chance) {
+            // Verify the item exists in the database
+            const itemExists = await Item.findOne({ itemId: lootItem.item_id });
+            
+            if (itemExists) {
+              req.session.scavenging.logs.push({
+                time: now,
+                message: `You found ${itemExists.name}!`
+              });
+              
+              // Add to loot
+              const existingLoot = req.session.scavenging.loot.find(
+                item => item.item_id === lootItem.item_id
+              );
+              
+              if (existingLoot) {
+                existingLoot.quantity = (existingLoot.quantity || 1) + 1;
+              } else {
+                req.session.scavenging.loot.push({
+                  item_id: lootItem.item_id,
+                  name: itemExists.name,
+                  quantity: 1
+                });
+              }
+            } else {
+              console.warn(`Item with ID ${lootItem.item_id} not found in database`);
+            }
+          }
+        }
+      }
+      
+      // End combat
+      req.session.scavenging.currentCombat = null;
+      await character.save();
+      return;
+    }
+    
+    // Monster attacks
+    const monsterDamage = Math.max(0, monster.damage);
+    combat.monsterDamage = monsterDamage;
+    
+    if (monsterDamage > 0) {
+      character.health.current -= monsterDamage;
+      req.session.scavenging.logs.push({
+        time: now,
+        message: `The ${monster.name} attacks you for ${monsterDamage} damage!`
+      });
+      
+      // Check if player died
+      if (character.health.current <= 0) {
+        // Set recovery period (10 minutes)
+        const recoveryTime = new Date();
+        recoveryTime.setMinutes(recoveryTime.getMinutes() + 10);
+        character.recoveryUntil = recoveryTime;
+        
+        // Set health to 1 for now (will be set to 25 when recovery ends)
+        character.health.current = 1;
+        
+        req.session.scavenging.logs.push({
+          time: now,
+          message: `You were knocked unconscious! You will be in recovery for 10 minutes.`
+        });
+        
+        // End scavenging session after this event
+        req.session.scavenging.logs.push({
+          time: now,
+          message: `You need to rest and recover your strength.`
+        });
+        
+        // End combat
+        req.session.scavenging.currentCombat = null;
+        
+        // Flag session to end
+        req.session.scavenging.shouldEnd = true;
+      }
+    } else {
+      req.session.scavenging.logs.push({
+        time: now,
+        message: `The ${monster.name} tries to attack but misses!`
+      });
+    }
+    
+    await character.save();
+  } catch (error) {
+    console.error('Error processing combat round:', error);
     throw error;
   }
 } 

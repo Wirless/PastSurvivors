@@ -40,6 +40,46 @@
             </div>
           </div>
         </div>
+        
+        <!-- New Combat Panel -->
+        <div class="combat-panel hidden" id="combat-panel">
+          <h4>Combat Encounter</h4>
+          <div class="combat-content">
+            <div class="combat-entities">
+              <div class="combat-entity player">
+                <div class="combat-entity-name">You</div>
+                <div class="health-bar-container">
+                  <div class="health-bar-wrapper">
+                    <div class="health-bar player-health-bar" id="player-health-bar"></div>
+                  </div>
+                  <div class="health-value" id="player-health-value">0/0</div>
+                </div>
+              </div>
+              <div class="combat-vs">VS</div>
+              <div class="combat-entity monster">
+                <div class="combat-entity-name" id="monster-name">Monster</div>
+                <div class="health-bar-container">
+                  <div class="health-bar-wrapper">
+                    <div class="health-bar monster-health-bar" id="monster-health-bar"></div>
+                  </div>
+                  <div class="health-value" id="monster-health-value">0/0</div>
+                </div>
+              </div>
+            </div>
+            <div class="monster-image-container" id="monster-image-container">
+              <!-- Monster image will be displayed here -->
+            </div>
+            <div class="combat-info">
+              <div class="combat-round">Round: <span id="combat-round">0</span></div>
+              <div class="combat-damage">
+                <div class="player-damage">Your damage: <span id="player-damage">0</span></div>
+                <div class="monster-damage">Monster damage: <span id="monster-damage">0</span></div>
+              </div>
+              <div class="combat-status" id="combat-status">Combat in progress...</div>
+            </div>
+          </div>
+        </div>
+        
         <div class="scavenge-log-container">
           <h4>Scavenge Log</h4>
           <div class="scavenge-log" id="scavenge-log">
@@ -220,6 +260,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const location = locations[currentLocationIndex];
     
     try {
+      // First check if character is in recovery
+      const characterResponse = await fetch('/api/character');
+      const characterData = await characterResponse.json();
+      
+      if (characterData.success && characterData.data) {
+        const character = characterData.data;
+        
+        // Check if in recovery
+        if (character.recoveryUntil) {
+          const recoveryDate = new Date(character.recoveryUntil);
+          if (recoveryDate > new Date()) {
+            const minutesLeft = Math.ceil((recoveryDate - new Date()) / (1000 * 60));
+            alert(`You cannot scavenge while recovering from injuries. Recovery ends in ${minutesLeft} minutes.`);
+            return;
+          }
+        }
+      }
+      
       const response = await fetch(`/api/scavenge/start/${location.id}`, {
         method: 'POST',
         headers: {
@@ -260,7 +318,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Add initial log entry
         addLogEntry(data.data.message || `Started scavenging at ${location.name}`);
       } else {
-        alert(data.message || 'Failed to start scavenging');
+        if (data.recovery) {
+          alert(`You cannot scavenge while recovering from injuries. Recovery ends in ${data.recovery.minutesLeft} minutes.`);
+        } else {
+          alert(data.message || 'Failed to start scavenging');
+        }
       }
     } catch (error) {
       console.error('Error starting scavenge:', error);
@@ -1029,5 +1091,178 @@ document.addEventListener('DOMContentLoaded', async () => {
   0% { opacity: 1; }
   50% { opacity: 0.5; }
   100% { opacity: 1; }
+}
+
+/* Combat Panel Styles */
+.combat-panel {
+  background-color: #282a36;
+  border: 1px solid #44475a;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 10px rgba(255, 85, 85, 0.3);
+}
+
+.combat-panel h4 {
+  text-align: center;
+  margin-top: 0;
+  color: #ff5555;
+  font-size: 1.2em;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.combat-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.combat-entities {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.combat-entity {
+  flex: 1;
+  padding: 10px;
+  border-radius: 5px;
+  background-color: rgba(40, 42, 54, 0.5);
+}
+
+.combat-entity.player {
+  border-left: 3px solid #8be9fd;
+}
+
+.combat-entity.monster {
+  border-left: 3px solid #ff5555;
+}
+
+.combat-entity-name {
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #f8f8f2;
+}
+
+.combat-vs {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #6272a4;
+  margin: 0 15px;
+}
+
+.health-bar-container {
+  margin-top: 5px;
+}
+
+.health-bar-wrapper {
+  height: 10px;
+  background-color: #44475a;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
+.health-bar {
+  height: 100%;
+  width: 100%;
+  transition: width 0.5s ease;
+}
+
+.player-health-bar {
+  background: linear-gradient(90deg, #8be9fd, #79e3fd);
+}
+
+.monster-health-bar {
+  background: linear-gradient(90deg, #ff5555, #ff79c6);
+}
+
+.health-value {
+  font-size: 0.8em;
+  color: #6272a4;
+  text-align: right;
+}
+
+.monster-image-container {
+  height: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(40, 42, 54, 0.3);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.monster-image {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.combat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: rgba(40, 42, 54, 0.3);
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.combat-round, .combat-damage {
+  display: flex;
+  justify-content: space-between;
+  color: #6272a4;
+  font-size: 0.9em;
+}
+
+.player-damage, .monster-damage {
+  flex: 1;
+}
+
+.player-damage {
+  color: #8be9fd;
+}
+
+.monster-damage {
+  color: #ff5555;
+  text-align: right;
+}
+
+.combat-status {
+  text-align: center;
+  color: #f1fa8c;
+  font-style: italic;
+  margin-top: 5px;
+}
+
+/* Combat animation */
+@keyframes attack-pulse {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(5px); }
+  75% { transform: translateX(-5px); }
+  100% { transform: translateX(0); }
+}
+
+.attacking {
+  animation: attack-pulse 0.5s ease;
+}
+
+/* Recovery countdown styles */
+.recovery-countdown {
+  margin-top: 5px;
+  padding: 5px;
+  background-color: rgba(255, 85, 85, 0.2);
+  border-radius: 3px;
+  text-align: center;
+  font-weight: bold;
+  color: #ff5555;
+}
+
+/* Disabled action button */
+.disabled-action {
+  cursor: not-allowed !important;
+  box-shadow: none !important;
 }
 </style> 

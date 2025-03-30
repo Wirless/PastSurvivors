@@ -7,7 +7,8 @@ const {
   unequipItem, 
   useItem,
   getItemById,
-  getEquippedItemBySlot 
+  getEquippedItemBySlot,
+  getAllItems 
 } = require('../controllers/inventory');
 const { protect } = require('../middleware/auth');
 const { checkCharacterCreated } = require('../middleware/character');
@@ -19,6 +20,7 @@ router.use(protect);
 router.use(checkCharacterCreated);
 
 router.get('/', getInventory);
+router.get('/items', getAllItems);
 router.get('/item/:id', getItemById);
 router.get('/equipped/:slot', getEquippedItemBySlot);
 router.post('/add', addItemToInventory);

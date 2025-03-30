@@ -365,6 +365,28 @@ Try going to the inventory page again now.`);
         document.getElementById('lck-value').textContent = character.stats.luck;
         document.getElementById('exp-value').textContent = character.experience;
         
+        // Check for scavenge or rest locks based on recovery
+        if (character.recoveryUntil) {
+          const recoveryDate = new Date(character.recoveryUntil);
+          if (recoveryDate > new Date()) {
+            // Character is in recovery period
+            const exploreBtn = document.getElementById('explore-btn');
+            const scavengeBtn = document.querySelector('a[href="/scavenge"]');
+            
+            if (exploreBtn) {
+              exploreBtn.disabled = true;
+              exploreBtn.style.opacity = '0.5';
+              exploreBtn.style.cursor = 'not-allowed';
+            }
+            
+            if (scavengeBtn) {
+              scavengeBtn.classList.add('disabled-action');
+              scavengeBtn.style.pointerEvents = 'none';
+              scavengeBtn.style.opacity = '0.5';
+            }
+          }
+        }
+        
         // Update status effects
         updateStatusEffects(character);
       } catch (err) {
@@ -384,6 +406,37 @@ Try going to the inventory page again now.`);
     statusEffectsContainer.innerHTML = '';
     
     const effects = [];
+    
+    // Check for recovery state
+    if (character.recoveryUntil) {
+      const recoveryEnds = new Date(character.recoveryUntil);
+      const now = new Date();
+      
+      if (recoveryEnds > now) {
+        const minutesLeft = Math.ceil((recoveryEnds - now) / (1000 * 60));
+        effects.push({
+          name: 'Recovering from Injury',
+          description: `Severely wounded. You cannot scavenge or explore for ${minutesLeft} more minutes.`,
+          class: 'effect-critical',
+          recoveryTime: minutesLeft
+        });
+        
+        // Disable scavenge and explore buttons
+        const scavengeBtn = document.querySelector('a[href="/scavenge"]');
+        const exploreBtn = document.getElementById('explore-btn');
+        
+        if (scavengeBtn) {
+          scavengeBtn.classList.add('disabled-action');
+          scavengeBtn.style.pointerEvents = 'none';
+          scavengeBtn.style.opacity = '0.5';
+        }
+        
+        if (exploreBtn) {
+          exploreBtn.disabled = true;
+          exploreBtn.style.opacity = '0.5';
+        }
+      }
+    }
     
     // Check for energy effects
     if (character.energy.current < 20) {
@@ -456,10 +509,21 @@ Try going to the inventory page again now.`);
       effects.forEach(effect => {
         const effectElement = document.createElement('div');
         effectElement.className = `status-effect ${effect.class}`;
-        effectElement.innerHTML = `
-          <div class="effect-name">${effect.name}</div>
-          <div class="effect-description">${effect.description}</div>
-        `;
+        
+        // For recovery effect, add countdown
+        if (effect.recoveryTime) {
+          effectElement.innerHTML = `
+            <div class="effect-name">${effect.name}</div>
+            <div class="effect-description">${effect.description}</div>
+            <div class="recovery-countdown">Time remaining: ${effect.recoveryTime} minutes</div>
+          `;
+        } else {
+          effectElement.innerHTML = `
+            <div class="effect-name">${effect.name}</div>
+            <div class="effect-description">${effect.description}</div>
+          `;
+        }
+        
         statusEffectsContainer.appendChild(effectElement);
       });
     } else {

@@ -1,7 +1,7 @@
 <div class="admin-container">
   <div class="admin-header">
     <h2 class="admin-title">Monster Management</h2>
-    <p class="subtitle">Create and manage game monsters</p>
+    <p class="subtitle">Manage monsters and their attributes</p>
   </div>
 
   <div class="admin-nav">
@@ -15,444 +15,432 @@
   </div>
 
   <div class="admin-content">
-    <div class="admin-toolbar">
-      <button class="admin-btn primary-btn" id="create-monster-btn">Create New Monster</button>
-      <div class="search-container">
+    <div class="action-bar">
+      <button class="admin-btn" id="save-all-btn">Save All Changes</button>
+      <button class="admin-btn" id="add-monster-btn">Add New Monster</button>
+      <div class="search-bar">
         <input type="text" id="monster-search" placeholder="Search monsters...">
-        <button class="admin-btn" id="search-btn">Search</button>
       </div>
     </div>
 
-    <div class="monsters-container">
-      <div class="monster-list" id="monster-list">
-        <!-- Monsters will be loaded here -->
-        <div class="loading">Loading monsters...</div>
-      </div>
+    <div class="monsters-list" id="monsters-list">
+      <div class="loading">Loading monsters...</div>
+    </div>
 
-      <div class="monster-form-container hidden" id="monster-form-container">
-        <h3 id="form-title">Create New Monster</h3>
-        <form id="monster-form">
-          <input type="hidden" id="monster-id">
-          
-          <div class="form-group">
-            <label for="monster-name">Name:</label>
-            <input type="text" id="monster-name" required>
-          </div>
-          
-          <div class="form-group">
-            <label for="monster-description">Description:</label>
-            <textarea id="monster-description" rows="3"></textarea>
-          </div>
-          
-          <div class="form-row">
-            <div class="form-group">
-              <label for="monster-health">Health:</label>
-              <input type="number" id="monster-health" min="1" value="10" required>
-            </div>
-            
-            <div class="form-group">
-              <label for="monster-damage">Damage:</label>
-              <input type="number" id="monster-damage" min="0" value="1" required>
-            </div>
-            
-            <div class="form-group">
-              <label for="monster-experience">Experience:</label>
-              <input type="number" id="monster-experience" min="1" value="5" required>
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label for="monster-chance">Encounter Chance (%):</label>
-            <input type="number" id="monster-chance" min="1" max="100" value="30" required>
-          </div>
-          
-          <div class="form-group">
-            <label>Monster Loot:</label>
-            <div class="loot-container" id="loot-container">
-              <!-- Loot items will be added here -->
-              <div class="loot-row">
-                <select class="loot-item"></select>
-                <input type="number" class="loot-chance" min="1" max="100" value="50" placeholder="Chance %">
-                <button type="button" class="admin-btn danger-btn remove-loot-btn">Remove</button>
-              </div>
-            </div>
-            <button type="button" class="admin-btn" id="add-loot-btn">Add Loot Item</button>
-          </div>
-          
-          <div class="form-actions">
-            <button type="submit" class="admin-btn primary-btn">Save Monster</button>
-            <button type="button" class="admin-btn" id="cancel-btn">Cancel</button>
-          </div>
-        </form>
-      </div>
+    <div class="monster-editor" id="monster-editor">
+      <div class="editor-placeholder">Select a monster to edit</div>
     </div>
   </div>
 </div>
 
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
-    // Elements
-    const monsterList = document.getElementById('monster-list');
-    const monsterFormContainer = document.getElementById('monster-form-container');
-    const monsterForm = document.getElementById('monster-form');
-    const createMonsterBtn = document.getElementById('create-monster-btn');
-    const cancelBtn = document.getElementById('cancel-btn');
-    const formTitle = document.getElementById('form-title');
-    const monsterId = document.getElementById('monster-id');
-    const lootContainer = document.getElementById('loot-container');
-    const addLootBtn = document.getElementById('add-loot-btn');
+    const monstersList = document.getElementById('monsters-list');
+    const monsterEditor = document.getElementById('monster-editor');
+    const monsterSearch = document.getElementById('monster-search');
+    const saveAllBtn = document.getElementById('save-all-btn');
+    const addMonsterBtn = document.getElementById('add-monster-btn');
     
-    // State
     let monsters = [];
-    let items = [];
-    let editMode = false;
+    let unsavedChanges = false;
     
-    // Load monsters and items
+    // Load monsters
     try {
-      // Load locations to extract monsters
-      const locationsResponse = await fetch('/api/scavenge/locations');
-      const locationsData = await locationsResponse.json();
+      const response = await fetch('/api/admin/monsters');
+      const data = await response.json();
       
-      if (locationsData.success && locationsData.data.locations) {
-        // Extract unique monsters
-        const monsterMap = new Map();
-        
-        locationsData.data.locations.forEach(location => {
-          location.encounters
-            .filter(encounter => encounter.type === 'monster')
-            .forEach(monster => {
-              if (!monsterMap.has(monster.id)) {
-                monsterMap.set(monster.id, monster);
-              }
-            });
-        });
-        
-        monsters = Array.from(monsterMap.values());
-        renderMonsterList();
-      }
-      
-      // Load items for loot selection
-      const itemsResponse = await fetch('/api/inventory/items');
-      const itemsData = await itemsResponse.json();
-      
-      if (itemsData.success && Array.isArray(itemsData.data)) {
-        items = itemsData.data;
-        populateLootSelects();
+      if (data.success && data.data) {
+        monsters = data.data.monsters || [];
+        renderMonstersList();
+      } else {
+        monstersList.innerHTML = '<div class="error-message">Failed to load monsters</div>';
       }
     } catch (error) {
-      console.error('Error loading data:', error);
-      monsterList.innerHTML = '<div class="error">Error loading monsters</div>';
+      console.error('Error loading monsters:', error);
+      monstersList.innerHTML = `<div class="error-message">Error loading monsters: ${error.message}</div>`;
     }
     
     // Event listeners
-    createMonsterBtn.addEventListener('click', () => {
-      showMonsterForm();
+    monsterSearch.addEventListener('input', () => {
+      renderMonstersList();
     });
     
-    cancelBtn.addEventListener('click', () => {
-      hideMonsterForm();
-    });
+    saveAllBtn.addEventListener('click', saveAllMonsters);
+    addMonsterBtn.addEventListener('click', createNewMonster);
     
-    monsterForm.addEventListener('submit', handleMonsterSubmit);
-    
-    addLootBtn.addEventListener('click', addLootRow);
-    
-    // Event delegation for remove loot buttons
-    lootContainer.addEventListener('click', (event) => {
-      if (event.target.classList.contains('remove-loot-btn')) {
-        // Remove the loot row
-        event.target.closest('.loot-row').remove();
+    // Handle unsaved changes
+    window.addEventListener('beforeunload', (e) => {
+      if (unsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return e.returnValue;
       }
     });
     
-    // Functions
-    function renderMonsterList() {
-      if (monsters.length === 0) {
-        monsterList.innerHTML = '<div class="empty-message">No monsters found</div>';
+    // Render monsters list
+    function renderMonstersList() {
+      const searchTerm = monsterSearch.value.toLowerCase();
+      const filteredMonsters = monsters.filter(monster => 
+        monster.name.toLowerCase().includes(searchTerm) || 
+        monster.id.toLowerCase().includes(searchTerm)
+      );
+      
+      if (filteredMonsters.length === 0) {
+        monstersList.innerHTML = '<div class="no-results">No monsters found</div>';
         return;
       }
       
-      monsterList.innerHTML = '';
+      let html = '<div class="list-container">';
       
-      monsters.forEach(monster => {
-        const monsterCard = document.createElement('div');
-        monsterCard.className = 'monster-card';
-        
-        monsterCard.innerHTML = `
-          <div class="monster-header">
-            <h3 class="monster-name">${monster.name}</h3>
-          </div>
-          <div class="monster-stats">
-            <div class="monster-stat">
-              <span class="stat-label">Health:</span>
-              <span class="stat-value">${monster.health}</span>
+      filteredMonsters.forEach(monster => {
+        html += `
+          <div class="list-item" data-id="${monster.id}">
+            <div class="item-info">
+              <div class="item-name">${monster.name}</div>
+              <div class="item-meta">ID: ${monster.id} | HP: ${monster.health} | DMG: ${monster.damage}</div>
             </div>
-            <div class="monster-stat">
-              <span class="stat-label">Damage:</span>
-              <span class="stat-value">${monster.damage}</span>
+            <div class="item-actions">
+              <button class="edit-btn" data-id="${monster.id}">Edit</button>
+              <button class="delete-btn" data-id="${monster.id}">Delete</button>
             </div>
-            <div class="monster-stat">
-              <span class="stat-label">XP:</span>
-              <span class="stat-value">${monster.experience}</span>
-            </div>
-          </div>
-          <div class="monster-loot">
-            <h4>Loot:</h4>
-            <ul>
-              ${monster.loot ? monster.loot.map(l => `
-                <li>${l.item_id.replace(/_/g, ' ')} (${l.chance}%)</li>
-              `).join('') : '<li>No loot defined</li>'}
-            </ul>
-          </div>
-          <div class="monster-actions">
-            <button class="admin-btn edit-btn" data-id="${monster.id}">Edit</button>
-            <button class="admin-btn danger-btn delete-btn" data-id="${monster.id}">Delete</button>
           </div>
         `;
-        
-        // Add event listeners
-        monsterCard.querySelector('.edit-btn').addEventListener('click', () => {
-          editMonster(monster);
+      });
+      
+      html += '</div>';
+      monstersList.innerHTML = html;
+      
+      // Add event listeners to buttons
+      document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const monsterId = e.target.getAttribute('data-id');
+          editMonster(monsterId);
         });
-        
-        monsterCard.querySelector('.delete-btn').addEventListener('click', () => {
-          if (confirm(`Are you sure you want to delete ${monster.name}?`)) {
-            deleteMonster(monster.id);
-          }
+      });
+      
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const monsterId = e.target.getAttribute('data-id');
+          deleteMonster(monsterId);
         });
-        
-        monsterList.appendChild(monsterCard);
       });
     }
     
-    function showMonsterForm(monster = null) {
-      // Reset form
-      monsterForm.reset();
+    // Edit monster
+    function editMonster(monsterId) {
+      const monster = monsters.find(m => m.id === monsterId);
       
-      // Clear loot container except for first row
-      while (lootContainer.children.length > 1) {
-        lootContainer.removeChild(lootContainer.lastChild);
+      if (!monster) {
+        alert('Monster not found');
+        return;
       }
       
-      if (monster) {
-        // Edit mode
-        editMode = true;
-        formTitle.textContent = `Edit ${monster.name}`;
-        monsterId.value = monster.id;
+      let html = `
+        <div class="editor-header">
+          <h3>Editing Monster: ${monster.name}</h3>
+          <button class="close-editor-btn">&times;</button>
+        </div>
+        <div class="editor-form">
+          <div class="form-row">
+            <label for="monster-id">ID:</label>
+            <input type="text" id="monster-id" value="${monster.id}" readonly>
+          </div>
+          <div class="form-row">
+            <label for="monster-name">Name:</label>
+            <input type="text" id="monster-name" value="${monster.name}">
+          </div>
+          <div class="form-row">
+            <label for="monster-description">Description:</label>
+            <textarea id="monster-description" rows="3">${monster.description || 'A fearsome creature.'}</textarea>
+          </div>
+          <div class="form-row">
+            <label for="monster-image">Image URL:</label>
+            <input type="text" id="monster-image" value="${monster.image || '/images/monsters/default.png'}">
+          </div>
+          
+          <div class="stats-section">
+            <h4>Combat Stats</h4>
+            <div class="form-row">
+              <label for="monster-health">Health:</label>
+              <input type="number" id="monster-health" value="${monster.health}" min="1">
+            </div>
+            <div class="form-row">
+              <label for="monster-damage">Damage:</label>
+              <input type="number" id="monster-damage" value="${monster.damage}" min="1">
+            </div>
+            <div class="form-row">
+              <label for="monster-experience">Experience Reward:</label>
+              <input type="number" id="monster-experience" value="${monster.experience || 5}" min="1">
+            </div>
+          </div>
+        </div>
         
-        document.getElementById('monster-name').value = monster.name;
-        document.getElementById('monster-description').value = monster.description || '';
-        document.getElementById('monster-health').value = monster.health;
-        document.getElementById('monster-damage').value = monster.damage;
-        document.getElementById('monster-experience').value = monster.experience;
-        document.getElementById('monster-chance').value = monster.chance;
-        
-        // Clear loot container
-        lootContainer.innerHTML = '';
-        
-        // Add loot rows
-        if (monster.loot && monster.loot.length > 0) {
-          monster.loot.forEach(loot => {
-            addLootRow(loot.item_id, loot.chance);
-          });
-        } else {
-          addLootRow();
-        }
+        <div class="loot-section">
+          <h4>Loot</h4>
+          <div class="loot-list" id="loot-list">
+      `;
+      
+      // Add loot
+      if (monster.loot && monster.loot.length > 0) {
+        monster.loot.forEach((loot, index) => {
+          html += `
+            <div class="loot-item" data-index="${index}">
+              <div class="loot-header">
+                <span>Item ID: ${loot.item_id}</span>
+                <div class="loot-actions">
+                  <button class="edit-loot-btn" data-index="${index}">Edit</button>
+                  <button class="delete-loot-btn" data-index="${index}">Delete</button>
+                </div>
+              </div>
+              <div class="loot-details">
+                <div>Chance: ${loot.chance}%</div>
+              </div>
+            </div>
+          `;
+        });
       } else {
-        // Create mode
-        editMode = false;
-        formTitle.textContent = 'Create New Monster';
-        monsterId.value = '';
-        
-        // Ensure at least one loot row
-        if (lootContainer.children.length === 0) {
-          addLootRow();
-        }
+        html += '<div class="no-loot">No loot defined</div>';
       }
       
-      // Show form container
-      monsterList.classList.add('hidden');
-      monsterFormContainer.classList.remove('hidden');
-    }
-    
-    function hideMonsterForm() {
-      monsterList.classList.remove('hidden');
-      monsterFormContainer.classList.add('hidden');
-    }
-    
-    function addLootRow(itemId = null, chance = 50) {
-      const lootRow = document.createElement('div');
-      lootRow.className = 'loot-row';
-      
-      // Create item select
-      const itemSelect = document.createElement('select');
-      itemSelect.className = 'loot-item';
-      itemSelect.required = true;
-      
-      // Add empty option
-      const emptyOption = document.createElement('option');
-      emptyOption.value = '';
-      emptyOption.textContent = '-- Select Item --';
-      itemSelect.appendChild(emptyOption);
-      
-      // Add item options
-      items.forEach(item => {
-        const option = document.createElement('option');
-        option.value = item.itemId;
-        option.textContent = item.name;
+      html += `
+          </div>
+          <button class="admin-btn" id="add-loot-btn">Add Loot</button>
+        </div>
         
-        if (itemId && item.itemId === itemId) {
-          option.selected = true;
+        <div class="editor-actions">
+          <button class="admin-btn" id="save-monster-btn">Save Changes</button>
+          <button class="cancel-btn" id="cancel-edit-btn">Cancel</button>
+        </div>
+      `;
+      
+      monsterEditor.innerHTML = html;
+      monsterEditor.classList.add('active');
+      
+      // Add event listeners
+      document.querySelector('.close-editor-btn').addEventListener('click', () => {
+        if (unsavedChanges) {
+          if (confirm('You have unsaved changes. Discard them?')) {
+            monsterEditor.classList.remove('active');
+            unsavedChanges = false;
+          }
+        } else {
+          monsterEditor.classList.remove('active');
         }
-        
-        itemSelect.appendChild(option);
       });
       
-      // Create chance input
-      const chanceInput = document.createElement('input');
-      chanceInput.type = 'number';
-      chanceInput.className = 'loot-chance';
-      chanceInput.min = 1;
-      chanceInput.max = 100;
-      chanceInput.value = chance;
-      chanceInput.placeholder = 'Chance %';
-      chanceInput.required = true;
-      
-      // Create remove button
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'admin-btn danger-btn remove-loot-btn';
-      removeBtn.textContent = 'Remove';
-      
-      // Add elements to row
-      lootRow.appendChild(itemSelect);
-      lootRow.appendChild(chanceInput);
-      lootRow.appendChild(removeBtn);
-      
-      // Add row to container
-      lootContainer.appendChild(lootRow);
-    }
-    
-    function populateLootSelects() {
-      // Populate all existing loot selects
-      const lootSelects = document.querySelectorAll('.loot-item');
-      
-      lootSelects.forEach(select => {
-        // Save current value
-        const currentValue = select.value;
-        
-        // Clear options
-        select.innerHTML = '';
-        
-        // Add empty option
-        const emptyOption = document.createElement('option');
-        emptyOption.value = '';
-        emptyOption.textContent = '-- Select Item --';
-        select.appendChild(emptyOption);
-        
-        // Add item options
-        items.forEach(item => {
-          const option = document.createElement('option');
-          option.value = item.itemId;
-          option.textContent = item.name;
-          
-          if (item.itemId === currentValue) {
-            option.selected = true;
+      document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+        if (unsavedChanges) {
+          if (confirm('You have unsaved changes. Discard them?')) {
+            monsterEditor.classList.remove('active');
+            unsavedChanges = false;
           }
-          
-          select.appendChild(option);
+        } else {
+          monsterEditor.classList.remove('active');
+        }
+      });
+      
+      document.getElementById('save-monster-btn').addEventListener('click', () => {
+        saveMonsterChanges(monsterId);
+      });
+      
+      document.getElementById('add-loot-btn').addEventListener('click', () => {
+        addLoot(monsterId);
+      });
+      
+      // Form change detection
+      document.querySelectorAll('.editor-form input, .editor-form textarea').forEach(input => {
+        input.addEventListener('input', () => {
+          unsavedChanges = true;
+        });
+      });
+      
+      // Edit loot buttons
+      document.querySelectorAll('.edit-loot-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const index = parseInt(e.target.getAttribute('data-index'));
+          editLoot(monsterId, index);
+        });
+      });
+      
+      // Delete loot buttons
+      document.querySelectorAll('.delete-loot-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const index = parseInt(e.target.getAttribute('data-index'));
+          deleteLoot(monsterId, index);
         });
       });
     }
     
-    async function handleMonsterSubmit(event) {
-      event.preventDefault();
+    // Save monster changes
+    function saveMonsterChanges(monsterId) {
+      const monster = monsters.find(m => m.id === monsterId);
       
-      // Get form values
-      const monster = {
-        id: monsterId.value || `monster_${Date.now()}`,
-        name: document.getElementById('monster-name').value,
-        description: document.getElementById('monster-description').value,
-        health: parseInt(document.getElementById('monster-health').value),
-        damage: parseInt(document.getElementById('monster-damage').value),
-        experience: parseInt(document.getElementById('monster-experience').value),
-        chance: parseInt(document.getElementById('monster-chance').value),
-        type: 'monster',
+      if (!monster) {
+        alert('Monster not found');
+        return;
+      }
+      
+      // Get updated values
+      monster.name = document.getElementById('monster-name').value;
+      monster.description = document.getElementById('monster-description').value;
+      monster.image = document.getElementById('monster-image').value;
+      monster.health = parseInt(document.getElementById('monster-health').value);
+      monster.damage = parseInt(document.getElementById('monster-damage').value);
+      monster.experience = parseInt(document.getElementById('monster-experience').value);
+      
+      // Update UI
+      renderMonstersList();
+      unsavedChanges = true;
+      alert('Monster updated! Remember to click "Save All Changes" to persist your changes.');
+    }
+    
+    // Add loot
+    function addLoot(monsterId) {
+      const monster = monsters.find(m => m.id === monsterId);
+      
+      if (!monster) {
+        alert('Monster not found');
+        return;
+      }
+      
+      const itemId = prompt('Enter item ID:');
+      
+      if (!itemId) {
+        return;
+      }
+      
+      const chance = parseInt(prompt('Enter drop chance (1-100):') || '50');
+      
+      if (!monster.loot) {
+        monster.loot = [];
+      }
+      
+      monster.loot.push({
+        item_id: itemId,
+        chance: chance
+      });
+      
+      // Refresh editor
+      editMonster(monsterId);
+      unsavedChanges = true;
+    }
+    
+    // Edit loot
+    function editLoot(monsterId, lootIndex) {
+      const monster = monsters.find(m => m.id === monsterId);
+      
+      if (!monster || !monster.loot || !monster.loot[lootIndex]) {
+        alert('Loot not found');
+        return;
+      }
+      
+      const loot = monster.loot[lootIndex];
+      
+      const itemId = prompt('Enter item ID:', loot.item_id);
+      
+      if (!itemId) {
+        return;
+      }
+      
+      const chance = parseInt(prompt('Enter drop chance (1-100):', loot.chance) || '50');
+      
+      monster.loot[lootIndex] = {
+        item_id: itemId,
+        chance: chance
+      };
+      
+      // Refresh editor
+      editMonster(monsterId);
+      unsavedChanges = true;
+    }
+    
+    // Delete loot
+    function deleteLoot(monsterId, lootIndex) {
+      const monster = monsters.find(m => m.id === monsterId);
+      
+      if (!monster || !monster.loot || !monster.loot[lootIndex]) {
+        alert('Loot not found');
+        return;
+      }
+      
+      if (confirm('Are you sure you want to delete this loot?')) {
+        monster.loot.splice(lootIndex, 1);
+        
+        // Refresh editor
+        editMonster(monsterId);
+        unsavedChanges = true;
+      }
+    }
+    
+    // Create new monster
+    function createNewMonster() {
+      const id = prompt('Enter monster ID (no spaces, lowercase):');
+      
+      if (!id) {
+        return;
+      }
+      
+      // Check if ID already exists
+      if (monsters.some(m => m.id === id)) {
+        alert('A monster with that ID already exists.');
+        return;
+      }
+      
+      const newMonster = {
+        id,
+        name: prompt('Enter monster name:') || 'New Monster',
+        description: prompt('Enter monster description:') || 'A fearsome creature.',
+        image: prompt('Enter image URL:') || '/images/monsters/default.png',
+        health: parseInt(prompt('Enter health:') || '10'),
+        damage: parseInt(prompt('Enter damage:') || '2'),
+        experience: parseInt(prompt('Enter experience reward:') || '5'),
         loot: []
       };
       
-      // Get loot items
-      const lootRows = lootContainer.querySelectorAll('.loot-row');
-      
-      lootRows.forEach(row => {
-        const itemId = row.querySelector('.loot-item').value;
-        const chance = parseInt(row.querySelector('.loot-chance').value);
-        
-        if (itemId && !isNaN(chance)) {
-          monster.loot.push({
-            item_id: itemId,
-            chance
-          });
-        }
-      });
-      
-      try {
-        // Save monster (in a real implementation, this would call an API)
-        if (editMode) {
-          // Update existing monster
-          const index = monsters.findIndex(m => m.id === monster.id);
-          
-          if (index !== -1) {
-            monsters[index] = monster;
-            alert(`Monster "${monster.name}" updated successfully!`);
-          }
-        } else {
-          // Add new monster
-          monsters.push(monster);
-          alert(`Monster "${monster.name}" created successfully!`);
-        }
-        
-        // Update monster list
-        renderMonsterList();
-        
-        // Hide form
-        hideMonsterForm();
-        
-        // In a real implementation, this would save to the server
-        saveMonsters();
-      } catch (error) {
-        console.error('Error saving monster:', error);
-        alert('Error saving monster');
-      }
+      monsters.push(newMonster);
+      renderMonstersList();
+      editMonster(id);
+      unsavedChanges = true;
     }
     
-    function editMonster(monster) {
-      showMonsterForm(monster);
-    }
-    
+    // Delete monster
     function deleteMonster(monsterId) {
-      // Find monster index
-      const index = monsters.findIndex(monster => monster.id === monsterId);
-      
-      if (index !== -1) {
-        // Remove monster
-        const monster = monsters[index];
-        monsters.splice(index, 1);
+      if (confirm(`Are you sure you want to delete the monster "${monsterId}"?`)) {
+        const index = monsters.findIndex(m => m.id === monsterId);
         
-        // Update monster list
-        renderMonsterList();
-        
-        alert(`Monster "${monster.name}" deleted successfully!`);
-        
-        // In a real implementation, this would save to the server
-        saveMonsters();
+        if (index !== -1) {
+          monsters.splice(index, 1);
+          renderMonstersList();
+          monsterEditor.innerHTML = '<div class="editor-placeholder">Select a monster to edit</div>';
+          monsterEditor.classList.remove('active');
+          unsavedChanges = true;
+        }
       }
     }
     
-    // In a real implementation, this would send a request to the server
-    function saveMonsters() {
-      console.log('Saving monsters:', monsters);
-      // This is where you would call the API to save the monsters
+    // Save all monsters
+    async function saveAllMonsters() {
+      try {
+        const response = await fetch('/api/admin/monsters/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ monsters })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          alert('Monsters saved successfully!');
+          unsavedChanges = false;
+        } else {
+          alert(`Failed to save monsters: ${data.message}`);
+        }
+      } catch (error) {
+        console.error('Error saving monsters:', error);
+        alert(`Error saving monsters: ${error.message}`);
+      }
     }
   });
 </script>
@@ -476,255 +464,280 @@
     margin-bottom: 5px;
   }
   
-  .admin-nav {
-    margin-bottom: 30px;
-  }
-  
   .admin-nav ul {
-    list-style: none;
     display: flex;
+    list-style: none;
     padding: 0;
-    margin: 0;
-    background-color: #282a36;
-    border-radius: 5px;
-    overflow: hidden;
+    margin: 0 0 20px 0;
+    border-bottom: 1px solid #44475a;
   }
   
   .admin-nav li {
-    flex-grow: 1;
-    text-align: center;
+    margin-right: 10px;
   }
   
   .admin-nav a {
     display: block;
-    padding: 15px;
-    color: #f8f8f2;
+    padding: 10px 15px;
     text-decoration: none;
-    transition: background-color 0.2s;
-  }
-  
-  .admin-nav a:hover {
-    background-color: #44475a;
+    color: #f8f8f2;
+    border-radius: 4px 4px 0 0;
   }
   
   .admin-nav a.active {
-    background-color: #50fa7b;
-    color: #282a36;
-    font-weight: bold;
-  }
-  
-  .admin-toolbar {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
-  
-  .search-container {
-    display: flex;
-    gap: 10px;
-  }
-  
-  .search-container input {
-    padding: 8px 12px;
-    border-radius: 4px;
-    border: 1px solid #44475a;
-    background-color: #282a36;
+    background-color: #44475a;
     color: #f8f8f2;
-    width: 250px;
   }
   
-  .monsters-container {
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .monster-list {
+  .admin-content {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: 1fr 2fr;
     gap: 20px;
   }
   
-  .monster-card {
-    background-color: #282a36;
-    border-radius: 5px;
-    padding: 15px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-  
-  .monster-header {
-    margin-bottom: 15px;
-    border-bottom: 1px solid #44475a;
-    padding-bottom: 10px;
-  }
-  
-  .monster-name {
-    margin: 0;
-    color: #ff79c6;
-    font-size: 1.5em;
-  }
-  
-  .monster-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 15px;
-  }
-  
-  .monster-stat {
-    text-align: center;
-  }
-  
-  .stat-label {
-    display: block;
-    color: #6272a4;
-    font-size: 0.9em;
-    margin-bottom: 5px;
-  }
-  
-  .stat-value {
-    display: block;
-    color: #f8f8f2;
-    font-size: 1.2em;
-    font-weight: bold;
-  }
-  
-  .monster-loot {
-    margin-bottom: 15px;
-  }
-  
-  .monster-loot h4 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    color: #8be9fd;
-  }
-  
-  .monster-loot ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  .monster-loot li {
-    color: #f8f8f2;
-    padding: 5px;
-    background-color: #44475a;
-    margin-bottom: 5px;
-    border-radius: 3px;
-    font-size: 0.9em;
-    text-transform: capitalize;
-  }
-  
-  .monster-actions {
+  .action-bar {
+    grid-column: 1 / -1;
     display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-  }
-  
-  .monster-form-container {
-    background-color: #282a36;
-    border-radius: 5px;
-    padding: 20px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-  
-  .monster-form-container h3 {
-    margin-top: 0;
-    color: #50fa7b;
+    justify-content: space-between;
     margin-bottom: 20px;
-    border-bottom: 1px solid #44475a;
-    padding-bottom: 10px;
-  }
-  
-  .form-group {
-    margin-bottom: 15px;
-  }
-  
-  .form-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    margin-bottom: 15px;
-  }
-  
-  label {
-    display: block;
-    margin-bottom: 5px;
-    color: #bd93f9;
-  }
-  
-  input, textarea, select {
-    width: 100%;
-    padding: 8px 12px;
-    border-radius: 4px;
-    border: 1px solid #44475a;
-    background-color: #383a59;
-    color: #f8f8f2;
-  }
-  
-  .loot-container {
-    margin-bottom: 10px;
-  }
-  
-  .loot-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr auto;
     gap: 10px;
-    margin-bottom: 10px;
-    align-items: center;
-  }
-  
-  .form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 20px;
   }
   
   .admin-btn {
+    display: inline-block;
     padding: 8px 16px;
+    background-color: #6272a4;
+    color: #f8f8f2;
+    text-decoration: none;
     border-radius: 4px;
     border: none;
     cursor: pointer;
     transition: background-color 0.2s;
     font-size: 14px;
-    background-color: #6272a4;
-    color: #f8f8f2;
   }
   
   .admin-btn:hover {
     background-color: #7b88ad;
   }
   
-  .admin-btn.primary-btn {
-    background-color: #50fa7b;
-    color: #282a36;
+  .search-bar {
+    flex-grow: 1;
+    max-width: 300px;
   }
   
-  .admin-btn.primary-btn:hover {
-    background-color: #70fa9b;
+  .search-bar input {
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #44475a;
+    background-color: #282a36;
+    color: #f8f8f2;
   }
   
-  .admin-btn.danger-btn {
+  .monsters-list {
+    background-color: #282a36;
+    border-radius: 5px;
+    padding: 15px;
+    height: 600px;
+    overflow-y: auto;
+  }
+  
+  .monster-editor {
+    background-color: #282a36;
+    border-radius: 5px;
+    padding: 15px;
+    height: 600px;
+    overflow-y: auto;
+  }
+  
+  .list-item {
+    padding: 10px;
+    border-bottom: 1px solid #44475a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .list-item:last-child {
+    border-bottom: none;
+  }
+  
+  .item-name {
+    font-weight: bold;
+    color: #f8f8f2;
+    margin-bottom: 5px;
+  }
+  
+  .item-meta {
+    font-size: 0.9em;
+    color: #6272a4;
+  }
+  
+  .item-actions {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .edit-btn, .delete-btn {
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    border: none;
+  }
+  
+  .edit-btn {
+    background-color: #6272a4;
+    color: #f8f8f2;
+  }
+  
+  .delete-btn {
     background-color: #ff5555;
     color: #f8f8f2;
   }
   
-  .admin-btn.danger-btn:hover {
-    background-color: #ff6e6e;
+  .editor-placeholder {
+    text-align: center;
+    color: #6272a4;
+    padding: 50px 0;
   }
   
-  .loading, .error, .empty-message {
-    grid-column: 1 / -1;
+  .editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #44475a;
+  }
+  
+  .editor-header h3 {
+    margin: 0;
+    color: #50fa7b;
+  }
+  
+  .close-editor-btn {
+    background: none;
+    border: none;
+    color: #ff5555;
+    font-size: 24px;
+    cursor: pointer;
+  }
+  
+  .form-row {
+    margin-bottom: 15px;
+  }
+  
+  .form-row label {
+    display: block;
+    margin-bottom: 5px;
+    color: #bd93f9;
+  }
+  
+  .form-row input, .form-row textarea {
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #44475a;
+    background-color: #21222c;
+    color: #f8f8f2;
+  }
+  
+  .form-row textarea {
+    resize: vertical;
+  }
+  
+  .form-row input[readonly] {
+    background-color: #191a21;
+    cursor: not-allowed;
+  }
+  
+  .stats-section, .loot-section {
+    margin-top: 30px;
+  }
+  
+  .stats-section h4, .loot-section h4 {
+    color: #ff79c6;
+    margin-bottom: 15px;
+  }
+  
+  .loot-list {
+    background-color: #21222c;
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .loot-item {
+    background-color: #282a36;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .loot-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #44475a;
+    font-weight: bold;
+    color: #f8f8f2;
+  }
+  
+  .loot-actions {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .edit-loot-btn, .delete-loot-btn {
+    padding: 3px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    border: none;
+  }
+  
+  .edit-loot-btn {
+    background-color: #6272a4;
+    color: #f8f8f2;
+  }
+  
+  .delete-loot-btn {
+    background-color: #ff5555;
+    color: #f8f8f2;
+  }
+  
+  .loot-details {
+    color: #6272a4;
+    font-size: 0.9em;
+  }
+  
+  .editor-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  
+  .cancel-btn {
+    background-color: #44475a;
+    color: #f8f8f2;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .no-loot, .no-results, .loading, .error-message {
     text-align: center;
     padding: 20px;
     color: #6272a4;
   }
   
-  .error {
+  .error-message {
     color: #ff5555;
-  }
-  
-  .hidden {
-    display: none;
   }
 </style> 

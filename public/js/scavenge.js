@@ -312,6 +312,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateLoot(data.data.loot);
           }
           
+          // Update combat information if available
+          if (data.data.currentCombat) {
+            updateCombatDisplay(data.data.currentCombat, data.data.characterHealth);
+          } else {
+            // Hide combat panel if no active combat
+            const combatPanel = document.getElementById('combat-panel');
+            if (combatPanel) {
+              combatPanel.classList.add('hidden');
+            }
+          }
+          
           // Update countdown for next event if available
           if (data.data.nextEventIn !== null) {
             updateNextEventCountdown(data.data.nextEventIn);
@@ -574,5 +585,69 @@ document.addEventListener('DOMContentLoaded', async () => {
   function showError(message) {
     showToast(message);
     console.error(message);
+  }
+  
+  // Update combat display with current combat information
+  function updateCombatDisplay(combat, characterHealth) {
+    const combatPanel = document.getElementById('combat-panel');
+    if (!combatPanel) return;
+    
+    // Show combat panel
+    combatPanel.classList.remove('hidden');
+    
+    // Update monster info
+    const monster = combat.monster;
+    const monsterNameElement = document.getElementById('monster-name');
+    const monsterHealthBar = document.getElementById('monster-health-bar');
+    const monsterHealthValue = document.getElementById('monster-health-value');
+    
+    if (monsterNameElement) monsterNameElement.textContent = monster.name;
+    
+    if (monsterHealthBar && monsterHealthValue) {
+      const monsterHealthPercent = (monster.currentHealth / monster.health) * 100;
+      monsterHealthBar.style.width = `${Math.max(0, Math.min(100, monsterHealthPercent))}%`;
+      monsterHealthValue.textContent = `${monster.currentHealth}/${monster.health}`;
+    }
+    
+    // Update player health
+    const playerHealthBar = document.getElementById('player-health-bar');
+    const playerHealthValue = document.getElementById('player-health-value');
+    
+    if (playerHealthBar && playerHealthValue && characterHealth) {
+      const playerHealthPercent = (characterHealth.current / characterHealth.max) * 100;
+      playerHealthBar.style.width = `${Math.max(0, Math.min(100, playerHealthPercent))}%`;
+      playerHealthValue.textContent = `${characterHealth.current}/${characterHealth.max}`;
+    }
+    
+    // Update combat round and damage info
+    const combatRoundElement = document.getElementById('combat-round');
+    const playerDamageElement = document.getElementById('player-damage');
+    const monsterDamageElement = document.getElementById('monster-damage');
+    
+    if (combatRoundElement) combatRoundElement.textContent = combat.rounds;
+    if (playerDamageElement) playerDamageElement.textContent = combat.playerDamage;
+    if (monsterDamageElement) monsterDamageElement.textContent = combat.monsterDamage;
+    
+    // Update monster image if available
+    const monsterImageContainer = document.getElementById('monster-image-container');
+    if (monsterImageContainer) {
+      if (monster.image) {
+        monsterImageContainer.innerHTML = `<img src="${monster.image}" alt="${monster.name}" class="monster-image">`;
+      } else {
+        monsterImageContainer.innerHTML = `<div class="monster-placeholder">${monster.name}</div>`;
+      }
+    }
+    
+    // Update combat status
+    const combatStatusElement = document.getElementById('combat-status');
+    if (combatStatusElement) {
+      if (monster.currentHealth <= 0) {
+        combatStatusElement.textContent = `You defeated the ${monster.name}!`;
+      } else if (characterHealth && characterHealth.current <= 0) {
+        combatStatusElement.textContent = 'You were knocked unconscious!';
+      } else {
+        combatStatusElement.textContent = `Combat in progress. Attack round: ${combat.rounds}`;
+      }
+    }
   }
 }); 

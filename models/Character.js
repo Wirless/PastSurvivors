@@ -86,6 +86,10 @@ const CharacterSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
+  recoveryUntil: {
+    type: Date,
+    default: null
+  },
   equipment: {
     head: {
       type: mongoose.Schema.ObjectId,
@@ -158,5 +162,15 @@ CharacterSchema.pre('save', function(next) {
   }
   next();
 });
+
+// Virtual property to check if character is in recovery mode
+CharacterSchema.virtual('isRecovering').get(function() {
+  if (!this.recoveryUntil) return false;
+  return new Date() < this.recoveryUntil;
+});
+
+// Make virtuals appear in JSON
+CharacterSchema.set('toJSON', { virtuals: true });
+CharacterSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Character', CharacterSchema); 

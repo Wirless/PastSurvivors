@@ -44,23 +44,44 @@ exports.createCharacter = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get user's character
+// @desc    Get character
 // @route   GET /api/character
 // @access  Private
 exports.getCharacter = asyncHandler(async (req, res) => {
-  const character = await Character.findOne({ user: req.user.id });
+  try {
+    const character = await Character.findOne({ user: req.user.id });
 
-  if (!character) {
-    return res.status(404).json({
+    if (!character) {
+      return res.status(404).json({
+        success: false,
+        message: 'No character found'
+      });
+    }
+    
+    // Check if recovery period has ended
+    if (character.recoveryUntil) {
+      const recoveryEnds = new Date(character.recoveryUntil);
+      const now = new Date();
+      
+      if (recoveryEnds <= now) {
+        // Recovery period has ended, set health to 25
+        character.health.current = 25;
+        character.recoveryUntil = null;
+        await character.save();
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: character
+    });
+  } catch (err) {
+    console.error('Error fetching character:', err);
+    res.status(500).json({
       success: false,
-      message: 'No character found'
+      message: 'Server Error'
     });
   }
-
-  res.status(200).json({
-    success: true,
-    data: character
-  });
 });
 
 // @desc    Update character
@@ -115,13 +136,28 @@ exports.updateCharacterEnergy = asyncHandler(async (req, res) => {
   const newEnergy = Math.min(character.energy.current + amount, character.energy.max);
   character.energy.current = newEnergy;
   
+  // Check if character is coming out of recovery
+  if (character.recoveryUntil) {
+    const recoveryEnds = new Date(character.recoveryUntil);
+    const now = new Date();
+    
+    if (recoveryEnds <= now) {
+      // Recovery period has ended
+      character.health.current = 25; // Set health to 25 as per requirements
+      character.recoveryUntil = null;
+    }
+  }
+  
   await character.save();
   
   res.status(200).json({
     success: true,
     data: {
       message: `Added ${amount} energy points`,
-      energy: character.energy
+      energy: character.energy,
+      health: character.health,
+      isRecovering: character.isRecovering,
+      recoveryUntil: character.recoveryUntil
     }
   });
 }); 

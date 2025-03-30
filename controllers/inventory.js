@@ -616,4 +616,24 @@ exports.useItem = async (req, res) => {
       message: 'Server Error'
     });
   }
+};
+
+// @desc    Get all items
+// @route   GET /api/inventory/items
+// @access  Private
+exports.getAllItems = async (req, res) => {
+  try {
+    const items = await Item.find({});
+
+    res.status(200).json({
+      success: true,
+      data: items
+    });
+  } catch (err) {
+    console.error('Error fetching all items:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
 }; 
