@@ -425,8 +425,24 @@ footer {
   background-color: var(--health-red);
 }
 
+.hunger-bar {
+  background-color: #a67c00;
+}
+
+.thirst-bar {
+  background-color: #0077cc;
+}
+
 .radiation-bar {
   background-color: var(--radiation-yellow);
+}
+
+.hunger-bar.warning, .thirst-bar.warning {
+  background-color: #cc7700;
+}
+
+.hunger-bar.critical, .thirst-bar.critical {
+  background-color: var(--health-red);
 }
 
 .stat-value {
@@ -472,6 +488,46 @@ footer {
 
 .action-button {
   width: 100%;
+}
+
+.status-section {
+  margin-top: 1rem;
+}
+
+.status-effect {
+  background-color: rgba(30, 30, 30, 0.8);
+  border: 1px solid var(--border-color);
+  padding: 0.8rem;
+  margin-bottom: 0.5rem;
+  border-radius: 3px;
+}
+
+.effect-name {
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+}
+
+.effect-description {
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.effect-critical {
+  border-left: 3px solid var(--health-red);
+}
+
+.effect-warning {
+  border-left: 3px solid var(--radiation-yellow);
+}
+
+.effect-minor {
+  border-left: 3px solid var(--toxic-green);
+}
+
+.no-effects {
+  color: #888;
+  text-align: center;
+  padding: 1rem;
 }
 
 /* Responsive adjustments */

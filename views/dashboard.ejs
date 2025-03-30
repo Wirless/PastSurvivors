@@ -17,6 +17,22 @@
         </div>
 
         <div class="stat-bar-container">
+          <div class="stat-label">Hunger</div>
+          <div class="stat-bar-wrapper">
+            <div class="stat-bar hunger-bar" id="hunger-bar"></div>
+            <div class="stat-value" id="hunger-value">--%</div>
+          </div>
+        </div>
+
+        <div class="stat-bar-container">
+          <div class="stat-label">Thirst</div>
+          <div class="stat-bar-wrapper">
+            <div class="stat-bar thirst-bar" id="thirst-bar"></div>
+            <div class="stat-value" id="thirst-value">--%</div>
+          </div>
+        </div>
+
+        <div class="stat-bar-container">
           <div class="stat-label">Radiation</div>
           <div class="stat-bar-wrapper">
             <div class="stat-bar radiation-bar" id="radiation-bar"></div>
@@ -52,9 +68,17 @@
     <div class="dashboard-section actions-section">
       <h3>Actions</h3>
       <div class="action-buttons">
-        <button class="action-button glow-button">Scavenge</button>
-        <button class="action-button glow-button">Rest</button>
-        <button class="action-button glow-button">Explore</button>
+        <button class="action-button glow-button" id="scavenge-btn">Scavenge</button>
+        <button class="action-button glow-button" id="rest-btn">Rest</button>
+        <button class="action-button glow-button" id="explore-btn">Explore</button>
+        <a href="/inventory" class="action-button glow-button">Inventory</a>
+      </div>
+    </div>
+
+    <div class="dashboard-section status-section">
+      <h3>Status Effects</h3>
+      <div class="status-effects" id="status-effects">
+        <p class="no-effects">No active effects</p>
       </div>
     </div>
   </div>
@@ -84,6 +108,30 @@
         healthBar.style.width = `${healthPercentage}%`;
         document.getElementById('health-value').textContent = `${character.health.current}/${character.health.max}`;
         
+        // Update hunger bar
+        const hungerBar = document.getElementById('hunger-bar');
+        hungerBar.style.width = `${character.hunger}%`;
+        document.getElementById('hunger-value').textContent = `${character.hunger}%`;
+        
+        // Change hunger bar color based on value
+        if (character.hunger < 30) {
+          hungerBar.classList.add('critical');
+        } else if (character.hunger < 60) {
+          hungerBar.classList.add('warning');
+        }
+        
+        // Update thirst bar
+        const thirstBar = document.getElementById('thirst-bar');
+        thirstBar.style.width = `${character.thirst}%`;
+        document.getElementById('thirst-value').textContent = `${character.thirst}%`;
+        
+        // Change thirst bar color based on value
+        if (character.thirst < 30) {
+          thirstBar.classList.add('critical');
+        } else if (character.thirst < 60) {
+          thirstBar.classList.add('warning');
+        }
+        
         // Update radiation bar
         const radiationBar = document.getElementById('radiation-bar');
         radiationBar.style.width = `${character.radiation}%`;
@@ -95,11 +143,101 @@
         document.getElementById('end-value').textContent = character.stats.endurance;
         document.getElementById('int-value').textContent = character.stats.intelligence;
         document.getElementById('lck-value').textContent = character.stats.luck;
+        
+        // Update status effects
+        updateStatusEffects(character);
       } else {
         console.error('Failed to load character data');
       }
     } catch (err) {
       console.error('Error loading character data:', err);
     }
+    
+    // Add event listeners for action buttons
+    document.getElementById('scavenge-btn').addEventListener('click', () => {
+      alert('Scavenging functionality will be implemented soon!');
+    });
+    
+    document.getElementById('rest-btn').addEventListener('click', () => {
+      alert('Resting functionality will be implemented soon!');
+    });
+    
+    document.getElementById('explore-btn').addEventListener('click', () => {
+      alert('Exploration functionality will be implemented soon!');
+    });
   });
+  
+  // Update status effects based on character condition
+  function updateStatusEffects(character) {
+    const statusEffectsContainer = document.getElementById('status-effects');
+    statusEffectsContainer.innerHTML = '';
+    
+    const effects = [];
+    
+    // Check for hunger effects
+    if (character.hunger < 30) {
+      effects.push({
+        name: 'Starving',
+        description: 'Severely reduced stamina and strength due to extreme hunger.',
+        class: 'effect-critical'
+      });
+    } else if (character.hunger < 60) {
+      effects.push({
+        name: 'Hungry',
+        description: 'Reduced stamina due to hunger.',
+        class: 'effect-warning'
+      });
+    }
+    
+    // Check for thirst effects
+    if (character.thirst < 30) {
+      effects.push({
+        name: 'Dehydrated',
+        description: 'Severely reduced stamina and agility due to extreme thirst.',
+        class: 'effect-critical'
+      });
+    } else if (character.thirst < 60) {
+      effects.push({
+        name: 'Thirsty',
+        description: 'Reduced stamina due to thirst.',
+        class: 'effect-warning'
+      });
+    }
+    
+    // Check for radiation effects
+    if (character.radiation > 70) {
+      effects.push({
+        name: 'Radiation Sickness',
+        description: 'Severe radiation poisoning. Health is decreasing rapidly.',
+        class: 'effect-critical'
+      });
+    } else if (character.radiation > 40) {
+      effects.push({
+        name: 'Irradiated',
+        description: 'Moderate radiation poisoning. Decreased endurance and intelligence.',
+        class: 'effect-warning'
+      });
+    } else if (character.radiation > 20) {
+      effects.push({
+        name: 'Slightly Irradiated',
+        description: 'Mild radiation exposure. Slight discomfort.',
+        class: 'effect-minor'
+      });
+    }
+    
+    // Display effects or "No active effects" message
+    if (effects.length > 0) {
+      effects.forEach(effect => {
+        const effectElement = document.createElement('div');
+        effectElement.className = `status-effect ${effect.class}`;
+        effectElement.innerHTML = `
+          <div class="effect-name">${effect.name}</div>
+          <div class="effect-description">${effect.description}</div>
+        `;
+        statusEffectsContainer.appendChild(effectElement);
+      });
+    } else {
+      statusEffectsContainer.innerHTML = '<p class="no-effects">No active effects</p>';
+    }
+  }
 </script> 

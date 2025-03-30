@@ -1,0 +1,26 @@
+const express = require('express');
+const { 
+  getInventory, 
+  addItemToInventory, 
+  removeItemFromInventory, 
+  equipItem, 
+  unequipItem, 
+  useItem 
+} = require('../controllers/inventory');
+const { protect } = require('../middleware/auth');
+const { checkCharacterCreated } = require('../middleware/character');
+
+const router = express.Router();
+
+// All routes are protected
+router.use(protect);
+router.use(checkCharacterCreated);
+
+router.get('/', getInventory);
+router.post('/add', addItemToInventory);
+router.post('/remove', removeItemFromInventory);
+router.post('/equip', equipItem);
+router.post('/unequip', unequipItem);
+router.post('/use', useItem);
+
+module.exports = router; 

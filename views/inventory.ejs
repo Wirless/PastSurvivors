@@ -1,0 +1,674 @@
+<div class="inventory-container">
+  <div class="inventory-header">
+    <h2 class="glitch-text">Survivor Inventory</h2>
+    <p class="subtitle" id="char-name">Loading character data...</p>
+  </div>
+
+  <div class="inventory-sections">
+    <div class="inventory-section equipment-section">
+      <h3>Equipment</h3>
+      <div class="equipment-slots">
+        <div class="equipment-slot head-slot" data-slot="head">
+          <div class="slot-label">Head</div>
+          <div class="slot-image" id="head-slot">
+            <img src="/images/slots/head-empty.png" alt="Head slot" class="empty-slot">
+          </div>
+        </div>
+        <div class="equipment-slot body-slot" data-slot="body">
+          <div class="slot-label">Body</div>
+          <div class="slot-image" id="body-slot">
+            <img src="/images/slots/body-empty.png" alt="Body slot" class="empty-slot">
+          </div>
+        </div>
+        <div class="equipment-slot hands-slot" data-slot="hands">
+          <div class="slot-label">Hands</div>
+          <div class="slot-image" id="hands-slot">
+            <img src="/images/slots/hands-empty.png" alt="Hands slot" class="empty-slot">
+          </div>
+        </div>
+        <div class="equipment-slot legs-slot" data-slot="legs">
+          <div class="slot-label">Legs</div>
+          <div class="slot-image" id="legs-slot">
+            <img src="/images/slots/legs-empty.png" alt="Legs slot" class="empty-slot">
+          </div>
+        </div>
+        <div class="equipment-slot feet-slot" data-slot="feet">
+          <div class="slot-label">Feet</div>
+          <div class="slot-image" id="feet-slot">
+            <img src="/images/slots/feet-empty.png" alt="Feet slot" class="empty-slot">
+          </div>
+        </div>
+        <div class="equipment-slot weapon-slot" data-slot="weapon">
+          <div class="slot-label">Weapon</div>
+          <div class="slot-image" id="weapon-slot">
+            <img src="/images/slots/weapon-empty.png" alt="Weapon slot" class="empty-slot">
+          </div>
+        </div>
+        <div class="equipment-slot accessory-slot" data-slot="accessory">
+          <div class="slot-label">Accessory</div>
+          <div class="slot-image" id="accessory-slot">
+            <img src="/images/slots/accessory-empty.png" alt="Accessory slot" class="empty-slot">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="inventory-section items-section">
+      <h3>Inventory <span id="inventory-count">0/20</span></h3>
+      <div class="inventory-grid" id="inventory-grid">
+        <!-- Inventory slots will be populated by JavaScript -->
+      </div>
+    </div>
+
+    <div class="inventory-section item-details-section">
+      <h3>Item Details</h3>
+      <div class="item-details" id="item-details">
+        <p class="no-item-selected">Select an item to view details</p>
+      </div>
+      <div class="item-actions" id="item-actions">
+        <!-- Actions will be populated by JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <div class="inventory-footer">
+    <a href="/dashboard" class="back-button glow-button">Back to Dashboard</a>
+  </div>
+</div>
+
+<!-- Item tooltip template -->
+<div id="item-tooltip" class="tooltip" style="display: none;"></div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    // Get character data and inventory
+    try {
+      const characterRes = await fetch('/api/character', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const characterData = await characterRes.json();
+      
+      if (characterData.success) {
+        // Update character name
+        document.getElementById('char-name').textContent = characterData.data.name;
+      }
+      
+      const inventoryRes = await fetch('/api/inventory', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const inventoryData = await inventoryRes.json();
+      
+      if (inventoryData.success) {
+        // Render inventory
+        renderInventory(inventoryData.data);
+      } else {
+        console.error('Failed to load inventory data');
+      }
+    } catch (err) {
+      console.error('Error loading data:', err);
+    }
+  });
+  
+  // Render the inventory and equipment
+  function renderInventory(data) {
+    // Update inventory count
+    const inventoryCount = document.getElementById('inventory-count');
+    inventoryCount.textContent = `${data.inventory.length}/${data.inventorySize}`;
+    
+    // Render equipment slots
+    renderEquipment(data.equipment);
+    
+    // Render inventory grid
+    renderInventoryGrid(data.inventory, data.inventorySize);
+    
+    // Setup event listeners for inventory interactions
+    setupInventoryInteractions();
+  }
+  
+  // Render equipment slots
+  function renderEquipment(equipment) {
+    const slots = ['head', 'body', 'hands', 'legs', 'feet', 'weapon', 'accessory'];
+    
+    slots.forEach(slot => {
+      const slotElement = document.getElementById(`${slot}-slot`);
+      
+      if (equipment[slot]) {
+        // Item is equipped
+        const item = equipment[slot];
+        slotElement.innerHTML = `
+          <img src="/images/items/${item.image}" alt="${item.name}" class="equipped-item" data-item-id="${item._id}">
+        `;
+      } else {
+        // Empty slot
+        slotElement.innerHTML = `
+          <img src="/images/slots/${slot}-empty.png" alt="${slot} slot" class="empty-slot">
+        `;
+      }
+    });
+  }
+  
+  // Render inventory grid
+  function renderInventoryGrid(inventory, inventorySize) {
+    const inventoryGrid = document.getElementById('inventory-grid');
+    inventoryGrid.innerHTML = '';
+    
+    // Create all slots (including empty ones)
+    for (let i = 0; i < inventorySize; i++) {
+      const inventorySlot = document.createElement('div');
+      inventorySlot.className = 'inventory-slot';
+      inventorySlot.dataset.slotIndex = i;
+      
+      // If there's an item in this slot
+      if (i < inventory.length) {
+        const inventoryItem = inventory[i];
+        const item = inventoryItem.item;
+        
+        inventorySlot.innerHTML = `
+          <div class="item" data-inventory-id="${inventoryItem._id}" data-item-id="${item._id}">
+            <img src="/images/items/${item.image}" alt="${item.name}">
+            ${inventoryItem.quantity > 1 ? `<div class="item-quantity">${inventoryItem.quantity}</div>` : ''}
+          </div>
+        `;
+        
+        // Add rarity class
+        inventorySlot.querySelector('.item').classList.add(`rarity-${item.rarity}`);
+      }
+      
+      inventoryGrid.appendChild(inventorySlot);
+    }
+  }
+  
+  // Setup event listeners for inventory interactions
+  function setupInventoryInteractions() {
+    const inventorySlots = document.querySelectorAll('.inventory-slot');
+    const equipmentSlots = document.querySelectorAll('.equipment-slot');
+    const tooltip = document.getElementById('item-tooltip');
+    
+    // Setup for inventory items
+    inventorySlots.forEach(slot => {
+      const itemElement = slot.querySelector('.item');
+      
+      if (itemElement) {
+        // Show tooltip on hover
+        itemElement.addEventListener('mouseenter', async (e) => {
+          const itemId = itemElement.dataset.itemId;
+          const inventoryId = itemElement.dataset.inventoryId;
+          
+          // Position tooltip near the mouse
+          tooltip.style.left = `${e.pageX + 10}px`;
+          tooltip.style.top = `${e.pageY + 10}px`;
+          
+          // Get item details
+          try {
+            // In a real implementation, we'd fetch item details if not already available
+            // For now, let's show a placeholder tooltip
+            tooltip.innerHTML = `
+              <div class="tooltip-header">${itemElement.querySelector('img').alt}</div>
+              <div class="tooltip-content">
+                <p>Hover tooltip with item details</p>
+              </div>
+            `;
+            tooltip.style.display = 'block';
+          } catch (err) {
+            console.error('Error fetching item details:', err);
+          }
+        });
+        
+        // Hide tooltip on mouseout
+        itemElement.addEventListener('mouseleave', () => {
+          tooltip.style.display = 'none';
+        });
+        
+        // Show item details on click
+        itemElement.addEventListener('click', () => {
+          showItemDetails(itemElement.dataset.inventoryId, 'inventory');
+        });
+      }
+    });
+    
+    // Setup for equipment items
+    equipmentSlots.forEach(slot => {
+      const itemElement = slot.querySelector('.equipped-item');
+      
+      if (itemElement) {
+        // Show tooltip on hover
+        itemElement.addEventListener('mouseenter', (e) => {
+          // Position tooltip near the mouse
+          tooltip.style.left = `${e.pageX + 10}px`;
+          tooltip.style.top = `${e.pageY + 10}px`;
+          
+          // Show placeholder tooltip
+          tooltip.innerHTML = `
+            <div class="tooltip-header">${itemElement.alt}</div>
+            <div class="tooltip-content">
+              <p>Equipped item details</p>
+            </div>
+          `;
+          tooltip.style.display = 'block';
+        });
+        
+        // Hide tooltip on mouseout
+        itemElement.addEventListener('mouseleave', () => {
+          tooltip.style.display = 'none';
+        });
+        
+        // Show item details on click
+        itemElement.addEventListener('click', () => {
+          showItemDetails(itemElement.dataset.itemId, 'equipment', slot.dataset.slot);
+        });
+      }
+    });
+  }
+  
+  // Show item details in the details panel
+  function showItemDetails(itemId, source, slot) {
+    const detailsPanel = document.getElementById('item-details');
+    const actionsPanel = document.getElementById('item-actions');
+    
+    // For now, show placeholder content
+    detailsPanel.innerHTML = `
+      <div class="item-detail-header">
+        <h4>Item Name</h4>
+        <div class="item-rarity">Common</div>
+      </div>
+      <div class="item-description">
+        Item description would go here. This item has various properties that affect your survivor.
+      </div>
+      <div class="item-stats">
+        <div class="item-stat">
+          <span class="stat-name">Weight:</span>
+          <span class="stat-value">1.0</span>
+        </div>
+        <div class="item-stat">
+          <span class="stat-name">Value:</span>
+          <span class="stat-value">10</span>
+        </div>
+      </div>
+    `;
+    
+    // Show appropriate actions based on item source
+    actionsPanel.innerHTML = '';
+    
+    if (source === 'inventory') {
+      // Actions for inventory items
+      const useButton = document.createElement('button');
+      useButton.className = 'action-button glow-button';
+      useButton.textContent = 'Use';
+      useButton.addEventListener('click', () => useItem(itemId));
+      
+      const equipButton = document.createElement('button');
+      equipButton.className = 'action-button glow-button';
+      equipButton.textContent = 'Equip';
+      equipButton.addEventListener('click', () => equipItem(itemId));
+      
+      const dropButton = document.createElement('button');
+      dropButton.className = 'action-button glow-button danger-button';
+      dropButton.textContent = 'Drop';
+      dropButton.addEventListener('click', () => dropItem(itemId));
+      
+      actionsPanel.appendChild(useButton);
+      actionsPanel.appendChild(equipButton);
+      actionsPanel.appendChild(dropButton);
+    } else if (source === 'equipment') {
+      // Actions for equipped items
+      const unequipButton = document.createElement('button');
+      unequipButton.className = 'action-button glow-button';
+      unequipButton.textContent = 'Unequip';
+      unequipButton.addEventListener('click', () => unequipItem(slot));
+      
+      actionsPanel.appendChild(unequipButton);
+    }
+  }
+  
+  // Placeholder functions for item actions
+  function useItem(inventoryItemId) {
+    console.log('Using item:', inventoryItemId);
+    alert('Using item functionality will be implemented soon!');
+  }
+  
+  function equipItem(inventoryItemId) {
+    console.log('Equipping item:', inventoryItemId);
+    alert('Equipping item functionality will be implemented soon!');
+  }
+  
+  function unequipItem(slot) {
+    console.log('Unequipping item from slot:', slot);
+    alert('Unequipping item functionality will be implemented soon!');
+  }
+  
+  function dropItem(inventoryItemId) {
+    console.log('Dropping item:', inventoryItemId);
+    alert('Dropping item functionality will be implemented soon!');
+  }
+</script>
+
+<style>
+  /* Additional inventory-specific styles */
+  .inventory-container {
+    padding: 1rem 0;
+  }
+  
+  .inventory-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  
+  .inventory-sections {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    grid-template-rows: auto 1fr;
+    gap: 1.5rem;
+  }
+  
+  .equipment-section {
+    grid-row: span 2;
+  }
+  
+  .inventory-section {
+    background-color: var(--background-darker);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    border-radius: 5px;
+  }
+  
+  .inventory-section h3 {
+    color: var(--toxic-green);
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  /* Equipment slots */
+  .equipment-slots {
+    display: grid;
+    grid-template-areas:
+      ". head ."
+      "weapon body accessory"
+      ". hands ."
+      ". legs ."
+      ". feet .";
+    gap: 1rem;
+    justify-items: center;
+  }
+  
+  .equipment-slot {
+    width: 80px;
+    height: 80px;
+    border: 1px solid var(--border-color);
+    background-color: rgba(30, 30, 30, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .equipment-slot:hover {
+    border-color: var(--toxic-green);
+    box-shadow: 0 0 10px rgba(90, 255, 21, 0.3);
+  }
+  
+  .slot-label {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 0.3rem;
+  }
+  
+  .slot-image {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .slot-image img {
+    max-width: 100%;
+    max-height: 100%;
+  }
+  
+  .empty-slot {
+    opacity: 0.3;
+  }
+  
+  /* Slot positioning */
+  .head-slot { grid-area: head; }
+  .body-slot { grid-area: body; }
+  .hands-slot { grid-area: hands; }
+  .legs-slot { grid-area: legs; }
+  .feet-slot { grid-area: feet; }
+  .weapon-slot { grid-area: weapon; }
+  .accessory-slot { grid-area: accessory; }
+  
+  /* Inventory grid */
+  .inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .inventory-slot {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid var(--border-color);
+    background-color: rgba(30, 30, 30, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    position: relative;
+  }
+  
+  .inventory-slot .item {
+    width: 80%;
+    height: 80%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+  }
+  
+  .inventory-slot .item img {
+    max-width: 100%;
+    max-height: 100%;
+  }
+  
+  .item-quantity {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background-color: var(--background-darker);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+  }
+  
+  /* Item rarity styles */
+  .rarity-common {
+    border: 1px solid #aaa;
+  }
+  
+  .rarity-uncommon {
+    border: 1px solid #0a0;
+    box-shadow: 0 0 5px rgba(0, 170, 0, 0.5);
+  }
+  
+  .rarity-rare {
+    border: 1px solid #00a;
+    box-shadow: 0 0 5px rgba(0, 0, 170, 0.5);
+  }
+  
+  .rarity-epic {
+    border: 1px solid #a0a;
+    box-shadow: 0 0 5px rgba(170, 0, 170, 0.5);
+  }
+  
+  .rarity-legendary {
+    border: 1px solid #aa0;
+    box-shadow: 0 0 8px rgba(170, 170, 0, 0.7);
+    animation: legendary-pulse 2s infinite;
+  }
+  
+  @keyframes legendary-pulse {
+    0%, 100% {
+      box-shadow: 0 0 8px rgba(170, 170, 0, 0.7);
+    }
+    50% {
+      box-shadow: 0 0 15px rgba(170, 170, 0, 0.9);
+    }
+  }
+  
+  /* Item details */
+  .no-item-selected {
+    color: #888;
+    text-align: center;
+    padding: 2rem 0;
+  }
+  
+  .item-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .item-rarity {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    background-color: rgba(30, 30, 30, 0.8);
+  }
+  
+  .item-description {
+    margin-bottom: 1.5rem;
+    line-height: 1.4;
+  }
+  
+  .item-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .item-stat {
+    display: flex;
+    justify-content: space-between;
+    background-color: rgba(30, 30, 30, 0.8);
+    padding: 0.5rem;
+    border-radius: 3px;
+  }
+  
+  .stat-name {
+    color: #888;
+  }
+  
+  .stat-value {
+    color: var(--toxic-green);
+  }
+  
+  /* Item actions */
+  .item-actions {
+    margin-top: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .danger-button {
+    border-color: var(--health-red);
+    color: var(--health-red);
+  }
+  
+  .danger-button:hover {
+    box-shadow: 0 0 15px rgba(255, 51, 51, 0.7);
+    background-color: rgba(255, 51, 51, 0.1);
+  }
+  
+  /* Tooltip */
+  .tooltip {
+    position: absolute;
+    z-index: 100;
+    background-color: rgba(10, 10, 10, 0.9);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 0.5rem;
+    min-width: 200px;
+    max-width: 300px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+  }
+  
+  .tooltip-header {
+    color: var(--toxic-green);
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .tooltip-content {
+    font-size: 0.9rem;
+  }
+  
+  /* Footer */
+  .inventory-footer {
+    margin-top: 2rem;
+    text-align: center;
+  }
+  
+  /* Responsive styles */
+  @media (max-width: 992px) {
+    .inventory-sections {
+      grid-template-columns: 1fr;
+    }
+    
+    .equipment-section {
+      grid-row: auto;
+    }
+    
+    .equipment-slots {
+      grid-template-areas:
+        "head weapon accessory"
+        "body hands legs"
+        "feet . .";
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .inventory-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  
+  @media (max-width: 576px) {
+    .inventory-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .equipment-slots {
+      grid-template-areas:
+        "head body"
+        "hands legs"
+        "feet weapon"
+        "accessory .";
+    }
+  }
+</style> 

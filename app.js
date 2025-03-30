@@ -9,6 +9,7 @@ require('dotenv').config();
 // Import routes
 const authRoutes = require('./routes/auth');
 const characterRoutes = require('./routes/character');
+const inventoryRoutes = require('./routes/inventory');
 
 // Import middleware
 const { protect } = require('./middleware/auth');
@@ -42,6 +43,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/character', characterRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // Public Routes
 app.get('/', (req, res) => {
@@ -62,7 +64,11 @@ app.get('/character/create', protect, checkCharacterNotCreated, (req, res) => {
 });
 
 app.get('/dashboard', protect, checkCharacterCreated, (req, res) => {
-  res.render('dashboard', { title: 'Dashboard - Postapo Survival' });
+  res.render('dashboard', { title: 'Dashboard - Postapo Survival', user: req.user });
+});
+
+app.get('/inventory', protect, checkCharacterCreated, (req, res) => {
+  res.render('inventory', { title: 'Inventory - Postapo Survival', user: req.user });
 });
 
 // Error handling middleware
