@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const ItemSchema = new mongoose.Schema({
+  itemId: {
+    type: String,
+    required: [true, 'Please add an item ID'],
+    unique: true,
+    trim: true
+  },
   name: {
     type: String,
     required: [true, 'Please add an item name'],

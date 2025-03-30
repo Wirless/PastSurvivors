@@ -1,0 +1,107 @@
+{
+  "locations": [
+    {
+      "id": "sewers",
+      "name": "Sewers",
+      "description": "Dark and dangerous underground tunnels filled with irradiated creatures and forgotten treasures.",
+      "image": "/images/sewers.jpg",
+      "energy_cost": 5,
+      "min_level": 1,
+      "encounters": [
+        {
+          "type": "monster",
+          "id": "rat",
+          "name": "Irradiated Rat",
+          "chance": 40,
+          "health": 5,
+          "damage": 1,
+          "experience": 2,
+          "loot": [
+            { "item_id": "rat_meat", "chance": 70 },
+            { "item_id": "dirty_water", "chance": 30 }
+          ]
+        },
+        {
+          "type": "monster",
+          "id": "mouse",
+          "name": "Radioactive Mouse",
+          "chance": 30,
+          "health": 3,
+          "damage": 1,
+          "experience": 2,
+          "loot": [
+            { "item_id": "small_meat", "chance": 50 }
+          ]
+        },
+        {
+          "type": "monster",
+          "id": "worm",
+          "name": "Glowing Worm",
+          "chance": 50,
+          "health": 2,
+          "damage": 0,
+          "experience": 1,
+          "loot": [
+            { "item_id": "worm_goo", "chance": 90 }
+          ]
+        },
+        {
+          "type": "item",
+          "chance": 60,
+          "items": [
+            { "item_id": "rusty_can", "chance": 40 },
+            { "item_id": "bottle_cap", "chance": 30 },
+            { "item_id": "scrap_metal", "chance": 20 },
+            { "item_id": "bandage", "chance": 10 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deeper_sewers",
+      "name": "Deeper Sewers",
+      "description": "The lowest levels of the sewer system. More dangerous, but with greater rewards.",
+      "image": "/images/sewers.jpg",
+      "energy_cost": 10,
+      "min_level": 3,
+      "encounters": [
+        {
+          "type": "monster",
+          "id": "giant_rat",
+          "name": "Giant Rat",
+          "chance": 40,
+          "health": 10,
+          "damage": 3,
+          "experience": 5,
+          "loot": [
+            { "item_id": "rat_meat", "chance": 90 },
+            { "item_id": "rat_tail", "chance": 50 }
+          ]
+        },
+        {
+          "type": "monster",
+          "id": "mutant_worm",
+          "name": "Mutant Worm",
+          "chance": 30,
+          "health": 8,
+          "damage": 2,
+          "experience": 4,
+          "loot": [
+            { "item_id": "worm_goo", "chance": 90 },
+            { "item_id": "mutagen", "chance": 20 }
+          ]
+        },
+        {
+          "type": "item",
+          "chance": 70,
+          "items": [
+            { "item_id": "medical_supplies", "chance": 30 },
+            { "item_id": "ammunition", "chance": 25 },
+            { "item_id": "clean_water", "chance": 25 },
+            { "item_id": "canned_food", "chance": 20 }
+          ]
+        }
+      ]
+    }
+  ]
+} 

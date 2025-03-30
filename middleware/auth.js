@@ -18,7 +18,14 @@ exports.protect = async (req, res, next) => {
 
   // Make sure token exists
   if (!token) {
-    return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
+    if (req.headers['content-type'] === 'application/json') {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to access this route'
+      });
+    } else {
+      return res.redirect('/login');
+    }
   }
 
   try {
@@ -29,19 +36,41 @@ exports.protect = async (req, res, next) => {
 
     next();
   } catch (err) {
-    return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
+    if (req.headers['content-type'] === 'application/json') {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to access this route'
+      });
+    } else {
+      return res.redirect('/login');
+    }
   }
 };
 
 // Grant access to specific roles
-exports.authorize = (...roles) => {
+exports.authorize = (role) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
+    if (!req.user) {
+      return res.status(401).json({
         success: false,
-        message: `User role ${req.user.role} is not authorized to access this route`
+        message: 'User not authenticated'
       });
     }
+
+    if (req.user.role !== role) {
+      if (req.headers['content-type'] === 'application/json') {
+        return res.status(403).json({
+          success: false,
+          message: `User role ${req.user.role} is not authorized to access this route`
+        });
+      } else {
+        return res.status(403).render('403', {
+          title: 'Access Denied',
+          message: 'You do not have permission to access this page.'
+        });
+      }
+    }
+
     next();
   };
 }; 

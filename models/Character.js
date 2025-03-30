@@ -44,6 +44,20 @@ const CharacterSchema = new mongoose.Schema({
       max: 10
     }
   },
+  experience: {
+    type: Number,
+    default: 0
+  },
+  energy: {
+    current: {
+      type: Number,
+      default: 100
+    },
+    max: {
+      type: Number,
+      default: 100
+    }
+  },
   health: {
     current: {
       type: Number,

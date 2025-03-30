@@ -1,0 +1,256 @@
+{
+  "items": [
+    {
+      "itemId": "rat_meat",
+      "name": "Rat Meat",
+      "description": "A piece of meat from an irradiated rat. Edible in a pinch but may have radioactive properties.",
+      "type": "consumable",
+      "subType": "food",
+      "rarity": "common",
+      "stats": {
+        "hungerRestore": 15,
+        "radiationEffect": 5
+      },
+      "value": 5,
+      "weight": 0.5,
+      "stackable": true,
+      "maxStack": 10,
+      "image": "/images/items/rat_meat.png",
+      "usable": true,
+      "effects": {
+        "hunger": 15,
+        "radiation": 5
+      }
+    },
+    {
+      "itemId": "small_meat",
+      "name": "Small Meat",
+      "description": "A tiny piece of meat. Not very filling, but better than nothing.",
+      "type": "consumable",
+      "subType": "food",
+      "rarity": "common",
+      "stats": {
+        "hungerRestore": 10,
+        "radiationEffect": 2
+      },
+      "value": 3,
+      "weight": 0.3,
+      "stackable": true,
+      "maxStack": 15,
+      "image": "/images/items/small_meat.png",
+      "usable": true,
+      "effects": {
+        "hunger": 10,
+        "radiation": 2
+      }
+    },
+    {
+      "itemId": "dirty_water",
+      "name": "Dirty Water",
+      "description": "Murky water collected from questionable sources. Quenches thirst but might cause radiation sickness.",
+      "type": "consumable",
+      "subType": "drink",
+      "rarity": "common",
+      "stats": {
+        "thirstRestore": 20,
+        "radiationEffect": 8
+      },
+      "value": 2,
+      "weight": 0.5,
+      "stackable": true,
+      "maxStack": 5,
+      "image": "/images/items/dirty_water.png",
+      "usable": true,
+      "effects": {
+        "thirst": 20,
+        "radiation": 8
+      }
+    },
+    {
+      "itemId": "worm_goo",
+      "name": "Worm Goo",
+      "description": "Slimy substance from mutated worms. Has medicinal properties despite its disgusting appearance.",
+      "type": "consumable",
+      "subType": "medicine",
+      "rarity": "uncommon",
+      "stats": {
+        "healthBonus": 5,
+        "radiationEffect": -5
+      },
+      "value": 15,
+      "weight": 0.2,
+      "stackable": true,
+      "maxStack": 5,
+      "image": "/images/items/worm_goo.png",
+      "usable": true,
+      "effects": {
+        "health": 5,
+        "radiation": -5
+      }
+    },
+    {
+      "itemId": "rusty_can",
+      "name": "Rusty Can",
+      "description": "An old tin can with traces of rust. Can be recycled for scrap metal.",
+      "type": "resource",
+      "subType": "material",
+      "rarity": "common",
+      "value": 1,
+      "weight": 0.3,
+      "stackable": true,
+      "maxStack": 20,
+      "image": "/images/items/rusty_can.png",
+      "usable": false
+    },
+    {
+      "itemId": "bottle_cap",
+      "name": "Bottle Cap",
+      "description": "An old bottle cap from before the apocalypse. Some survivors use these as currency.",
+      "type": "resource",
+      "subType": "valuable",
+      "rarity": "common",
+      "value": 1,
+      "weight": 0.1,
+      "stackable": true,
+      "maxStack": 100,
+      "image": "/images/items/bottle_cap.png",
+      "usable": false
+    },
+    {
+      "itemId": "scrap_metal",
+      "name": "Scrap Metal",
+      "description": "Pieces of metal salvaged from ruins. Essential for crafting and repairs.",
+      "type": "resource",
+      "subType": "material",
+      "rarity": "common",
+      "value": 5,
+      "weight": 1.0,
+      "stackable": true,
+      "maxStack": 20,
+      "image": "/images/items/scrap_metal.png",
+      "usable": false
+    },
+    {
+      "itemId": "bandage",
+      "name": "Bandage",
+      "description": "A simple cloth bandage for treating wounds. Restores a small amount of health.",
+      "type": "consumable",
+      "subType": "medicine",
+      "rarity": "common",
+      "stats": {
+        "healthBonus": 10
+      },
+      "value": 10,
+      "weight": 0.1,
+      "stackable": true,
+      "maxStack": 10,
+      "image": "/images/items/bandage.png",
+      "usable": true,
+      "effects": {
+        "health": 10
+      }
+    },
+    {
+      "itemId": "rat_tail",
+      "name": "Rat Tail",
+      "description": "The tail of a giant rat. Some traders might be interested in these.",
+      "type": "resource",
+      "subType": "valuable",
+      "rarity": "uncommon",
+      "value": 12,
+      "weight": 0.2,
+      "stackable": true,
+      "maxStack": 20,
+      "image": "/images/items/rat_tail.png",
+      "usable": false
+    },
+    {
+      "itemId": "mutagen",
+      "name": "Mutagen",
+      "description": "A strange glowing substance extracted from mutated creatures. Highly valued for scientific research.",
+      "type": "resource",
+      "subType": "valuable",
+      "rarity": "rare",
+      "value": 50,
+      "weight": 0.3,
+      "stackable": true,
+      "maxStack": 5,
+      "image": "/images/items/mutagen.png",
+      "usable": false
+    },
+    {
+      "itemId": "medical_supplies",
+      "name": "Medical Supplies",
+      "description": "A small kit of basic medical supplies. Significantly restores health.",
+      "type": "consumable",
+      "subType": "medicine",
+      "rarity": "uncommon",
+      "stats": {
+        "healthBonus": 25
+      },
+      "value": 30,
+      "weight": 0.5,
+      "stackable": true,
+      "maxStack": 5,
+      "image": "/images/items/medical_supplies.png",
+      "usable": true,
+      "effects": {
+        "health": 25
+      }
+    },
+    {
+      "itemId": "ammunition",
+      "name": "Ammunition",
+      "description": "A small box of mixed ammunition. Essential for ranged weapons.",
+      "type": "resource",
+      "subType": "valuable",
+      "rarity": "uncommon",
+      "value": 25,
+      "weight": 0.5,
+      "stackable": true,
+      "maxStack": 10,
+      "image": "/images/items/ammunition.png",
+      "usable": false
+    },
+    {
+      "itemId": "clean_water",
+      "name": "Clean Water",
+      "description": "A bottle of purified water. Completely safe to drink.",
+      "type": "consumable",
+      "subType": "drink",
+      "rarity": "uncommon",
+      "stats": {
+        "thirstRestore": 30
+      },
+      "value": 20,
+      "weight": 0.5,
+      "stackable": true,
+      "maxStack": 5,
+      "image": "/images/items/clean_water.png",
+      "usable": true,
+      "effects": {
+        "thirst": 30
+      }
+    },
+    {
+      "itemId": "canned_food",
+      "name": "Canned Food",
+      "description": "A sealed can of preserved food. Still edible after all these years.",
+      "type": "consumable",
+      "subType": "food",
+      "rarity": "uncommon",
+      "stats": {
+        "hungerRestore": 25
+      },
+      "value": 20,
+      "weight": 0.8,
+      "stackable": true,
+      "maxStack": 5,
+      "image": "/images/items/canned_food.png",
+      "usable": true,
+      "effects": {
+        "hunger": 25
+      }
+    }
+  ]
+} 

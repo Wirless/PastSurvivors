@@ -140,4 +140,46 @@ const sendTokenResponse = (user, statusCode, res) => {
       success: true,
       token
     });
+};
+
+// @desc    Create admin user if not exists
+// @route   POST /api/auth/create-admin
+// @access  Public
+exports.createAdminUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Check if admin user already exists
+    const existingAdmin = await User.findOne({ email, role: 'admin' });
+    
+    if (existingAdmin) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin user already exists'
+      });
+    }
+    
+    // Create admin user
+    const user = await User.create({
+      username: 'admin',
+      email,
+      password,
+      role: 'admin'
+    });
+    
+    // Don't return the password
+    user.password = undefined;
+    
+    res.status(201).json({
+      success: true,
+      message: 'Admin user created successfully',
+      data: user
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
 }; 

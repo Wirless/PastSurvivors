@@ -1,0 +1,742 @@
+<div class="admin-container">
+  <div class="admin-header">
+    <h2 class="admin-title">Item Management</h2>
+    <p class="subtitle">Create and manage game items</p>
+  </div>
+
+  <div class="admin-nav">
+    <ul>
+      <li><a href="/admin/dashboard">Dashboard</a></li>
+      <li><a href="/admin/monsters">Monsters</a></li>
+      <li><a href="/admin/items" class="active">Items</a></li>
+      <li><a href="/admin/locations">Locations</a></li>
+      <li><a href="/dashboard">Return to Game</a></li>
+    </ul>
+  </div>
+
+  <div class="admin-content">
+    <div class="admin-toolbar">
+      <button class="admin-btn primary-btn" id="create-item-btn">Create New Item</button>
+      <div class="search-container">
+        <input type="text" id="item-search" placeholder="Search items...">
+        <button class="admin-btn" id="search-btn">Search</button>
+      </div>
+    </div>
+
+    <div class="items-container">
+      <div class="item-list" id="item-list">
+        <!-- Items will be loaded here -->
+        <div class="loading">Loading items...</div>
+      </div>
+
+      <div class="item-form-container hidden" id="item-form-container">
+        <h3 id="form-title">Create New Item</h3>
+        <form id="item-form">
+          <input type="hidden" id="item-id">
+          
+          <div class="form-group">
+            <label for="item-name">Name:</label>
+            <input type="text" id="item-name" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="item-description">Description:</label>
+            <textarea id="item-description" rows="3"></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label for="item-image">Image Path:</label>
+            <input type="text" id="item-image" placeholder="e.g., /images/items/item.png">
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="item-type">Type:</label>
+              <select id="item-type" required>
+                <option value="consumable">Consumable</option>
+                <option value="weapon">Weapon</option>
+                <option value="armor">Armor</option>
+                <option value="resource">Resource</option>
+                <option value="quest">Quest Item</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="item-weight">Weight:</label>
+              <input type="number" id="item-weight" min="0" step="0.1" value="1">
+            </div>
+            
+            <div class="form-group">
+              <label for="item-value">Value:</label>
+              <input type="number" id="item-value" min="0" value="10">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Is Usable:</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="is-usable" value="true"> Yes
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="is-usable" value="false" checked> No
+              </label>
+            </div>
+          </div>
+          
+          <div class="effects-container" id="effects-container">
+            <h4>Item Effects (when used)</h4>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="effect-health">Health:</label>
+                <input type="number" id="effect-health" value="0">
+              </div>
+              
+              <div class="form-group">
+                <label for="effect-hunger">Hunger:</label>
+                <input type="number" id="effect-hunger" value="0">
+              </div>
+              
+              <div class="form-group">
+                <label for="effect-thirst">Thirst:</label>
+                <input type="number" id="effect-thirst" value="0">
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="effect-energy">Energy:</label>
+                <input type="number" id="effect-energy" value="0">
+              </div>
+              
+              <div class="form-group">
+                <label for="effect-radiation">Radiation:</label>
+                <input type="number" id="effect-radiation" value="0">
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-actions">
+            <button type="submit" class="admin-btn primary-btn">Save Item</button>
+            <button type="button" class="admin-btn" id="cancel-btn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    // Elements
+    const itemList = document.getElementById('item-list');
+    const itemFormContainer = document.getElementById('item-form-container');
+    const itemForm = document.getElementById('item-form');
+    const createItemBtn = document.getElementById('create-item-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const formTitle = document.getElementById('form-title');
+    const itemId = document.getElementById('item-id');
+    const itemType = document.getElementById('item-type');
+    const effectsContainer = document.getElementById('effects-container');
+    const isUsableRadios = document.getElementsByName('is-usable');
+    
+    // State
+    let items = [];
+    let editMode = false;
+    
+    // Load items
+    try {
+      const response = await fetch('/api/inventory/items');
+      const data = await response.json();
+      
+      if (data.success && Array.isArray(data.data)) {
+        items = data.data;
+        renderItemList();
+      } else {
+        itemList.innerHTML = '<div class="error">Failed to load items</div>';
+      }
+    } catch (error) {
+      console.error('Error loading items:', error);
+      itemList.innerHTML = '<div class="error">Error loading items</div>';
+    }
+    
+    // Event listeners
+    createItemBtn.addEventListener('click', () => {
+      showItemForm();
+    });
+    
+    cancelBtn.addEventListener('click', () => {
+      hideItemForm();
+    });
+    
+    itemForm.addEventListener('submit', handleItemSubmit);
+    
+    // Toggle effects container based on item usability
+    isUsableRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (radio.value === 'true') {
+          effectsContainer.classList.remove('hidden');
+        } else {
+          effectsContainer.classList.add('hidden');
+        }
+      });
+    });
+    
+    // Functions
+    function renderItemList() {
+      if (items.length === 0) {
+        itemList.innerHTML = '<div class="empty-message">No items found</div>';
+        return;
+      }
+      
+      itemList.innerHTML = '';
+      
+      items.forEach(item => {
+        const itemCard = document.createElement('div');
+        itemCard.className = 'item-card';
+        
+        // Create effects description
+        let effectsDescription = 'No effects';
+        
+        if (item.effects) {
+          const effects = [];
+          
+          if (item.effects.health) effects.push(`Health: ${item.effects.health > 0 ? '+' : ''}${item.effects.health}`);
+          if (item.effects.hunger) effects.push(`Hunger: ${item.effects.hunger > 0 ? '+' : ''}${item.effects.hunger}`);
+          if (item.effects.thirst) effects.push(`Thirst: ${item.effects.thirst > 0 ? '+' : ''}${item.effects.thirst}`);
+          if (item.effects.energy) effects.push(`Energy: ${item.effects.energy > 0 ? '+' : ''}${item.effects.energy}`);
+          if (item.effects.radiation) effects.push(`Radiation: ${item.effects.radiation > 0 ? '+' : ''}${item.effects.radiation}`);
+          
+          if (effects.length > 0) {
+            effectsDescription = effects.join(', ');
+          }
+        }
+        
+        itemCard.innerHTML = `
+          <div class="item-header">
+            <div class="item-image">
+              ${item.image ? `<img src="${item.image}" alt="${item.name}">` : '<div class="no-image">No Image</div>'}
+            </div>
+            <div class="item-title">
+              <h3 class="item-name">${item.name}</h3>
+              <div class="item-type">${item.type || 'Resource'}</div>
+            </div>
+          </div>
+          <div class="item-body">
+            <div class="item-description">${item.description || 'No description'}</div>
+            <div class="item-properties">
+              <div class="item-property">
+                <span class="property-label">Weight:</span>
+                <span class="property-value">${item.weight || 0}</span>
+              </div>
+              <div class="item-property">
+                <span class="property-label">Value:</span>
+                <span class="property-value">${item.value || 0}</span>
+              </div>
+              <div class="item-property">
+                <span class="property-label">Usable:</span>
+                <span class="property-value">${item.usable ? 'Yes' : 'No'}</span>
+              </div>
+            </div>
+            ${item.usable ? `
+              <div class="item-effects">
+                <h4>Effects when used:</h4>
+                <div class="effects-description">${effectsDescription}</div>
+              </div>
+            ` : ''}
+          </div>
+          <div class="item-actions">
+            <button class="admin-btn edit-btn" data-id="${item.itemId}">Edit</button>
+            <button class="admin-btn danger-btn delete-btn" data-id="${item.itemId}">Delete</button>
+          </div>
+        `;
+        
+        // Add event listeners
+        itemCard.querySelector('.edit-btn').addEventListener('click', () => {
+          editItem(item);
+        });
+        
+        itemCard.querySelector('.delete-btn').addEventListener('click', () => {
+          if (confirm(`Are you sure you want to delete ${item.name}?`)) {
+            deleteItem(item.itemId);
+          }
+        });
+        
+        itemList.appendChild(itemCard);
+      });
+    }
+    
+    function showItemForm(item = null) {
+      // Reset form
+      itemForm.reset();
+      
+      if (item) {
+        // Edit mode
+        editMode = true;
+        formTitle.textContent = `Edit ${item.name}`;
+        itemId.value = item.itemId;
+        
+        document.getElementById('item-name').value = item.name;
+        document.getElementById('item-description').value = item.description || '';
+        document.getElementById('item-image').value = item.image || '';
+        document.getElementById('item-type').value = item.type || 'resource';
+        document.getElementById('item-weight').value = item.weight || 0;
+        document.getElementById('item-value').value = item.value || 0;
+        
+        // Set usable radio button
+        const usableValue = item.usable ? 'true' : 'false';
+        document.querySelector(`input[name="is-usable"][value="${usableValue}"]`).checked = true;
+        
+        // Show/hide effects container
+        if (item.usable) {
+          effectsContainer.classList.remove('hidden');
+        } else {
+          effectsContainer.classList.add('hidden');
+        }
+        
+        // Set effects
+        if (item.effects) {
+          document.getElementById('effect-health').value = item.effects.health || 0;
+          document.getElementById('effect-hunger').value = item.effects.hunger || 0;
+          document.getElementById('effect-thirst').value = item.effects.thirst || 0;
+          document.getElementById('effect-energy').value = item.effects.energy || 0;
+          document.getElementById('effect-radiation').value = item.effects.radiation || 0;
+        }
+      } else {
+        // Create mode
+        editMode = false;
+        formTitle.textContent = 'Create New Item';
+        itemId.value = '';
+        
+        // Set default values
+        document.querySelector('input[name="is-usable"][value="false"]').checked = true;
+        effectsContainer.classList.add('hidden');
+      }
+      
+      // Show form container
+      itemList.classList.add('hidden');
+      itemFormContainer.classList.remove('hidden');
+    }
+    
+    function hideItemForm() {
+      itemList.classList.remove('hidden');
+      itemFormContainer.classList.add('hidden');
+    }
+    
+    async function handleItemSubmit(event) {
+      event.preventDefault();
+      
+      // Get form values
+      const isUsable = document.querySelector('input[name="is-usable"]:checked').value === 'true';
+      
+      const item = {
+        itemId: itemId.value || `item_${Date.now()}`,
+        name: document.getElementById('item-name').value,
+        description: document.getElementById('item-description').value,
+        image: document.getElementById('item-image').value,
+        type: document.getElementById('item-type').value,
+        weight: parseFloat(document.getElementById('item-weight').value),
+        value: parseInt(document.getElementById('item-value').value),
+        usable: isUsable
+      };
+      
+      // Add effects if item is usable
+      if (isUsable) {
+        item.effects = {
+          health: parseInt(document.getElementById('effect-health').value) || 0,
+          hunger: parseInt(document.getElementById('effect-hunger').value) || 0,
+          thirst: parseInt(document.getElementById('effect-thirst').value) || 0,
+          energy: parseInt(document.getElementById('effect-energy').value) || 0,
+          radiation: parseInt(document.getElementById('effect-radiation').value) || 0
+        };
+      }
+      
+      try {
+        // Save item (in a real implementation, this would call an API)
+        if (editMode) {
+          // Update existing item
+          const index = items.findIndex(i => i.itemId === item.itemId);
+          
+          if (index !== -1) {
+            items[index] = item;
+            alert(`Item "${item.name}" updated successfully!`);
+          }
+        } else {
+          // Add new item
+          items.push(item);
+          alert(`Item "${item.name}" created successfully!`);
+        }
+        
+        // Update item list
+        renderItemList();
+        
+        // Hide form
+        hideItemForm();
+        
+        // In a real implementation, this would save to the server
+        saveItems();
+      } catch (error) {
+        console.error('Error saving item:', error);
+        alert('Error saving item');
+      }
+    }
+    
+    function editItem(item) {
+      showItemForm(item);
+    }
+    
+    function deleteItem(itemId) {
+      // Find item index
+      const index = items.findIndex(item => item.itemId === itemId);
+      
+      if (index !== -1) {
+        // Remove item
+        const item = items[index];
+        items.splice(index, 1);
+        
+        // Update item list
+        renderItemList();
+        
+        alert(`Item "${item.name}" deleted successfully!`);
+        
+        // In a real implementation, this would save to the server
+        saveItems();
+      }
+    }
+    
+    // In a real implementation, this would send a request to the server
+    function saveItems() {
+      console.log('Saving items:', items);
+      // This is where you would call the API to save the items
+    }
+  });
+</script>
+
+<style>
+  .admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .admin-header {
+    margin-bottom: 30px;
+    border-bottom: 2px solid #333;
+    padding-bottom: 15px;
+  }
+  
+  .admin-title {
+    color: #50fa7b;
+    font-size: 2.5em;
+    margin-bottom: 5px;
+  }
+  
+  .admin-nav {
+    margin-bottom: 30px;
+  }
+  
+  .admin-nav ul {
+    list-style: none;
+    display: flex;
+    padding: 0;
+    margin: 0;
+    background-color: #282a36;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  
+  .admin-nav li {
+    flex-grow: 1;
+    text-align: center;
+  }
+  
+  .admin-nav a {
+    display: block;
+    padding: 15px;
+    color: #f8f8f2;
+    text-decoration: none;
+    transition: background-color 0.2s;
+  }
+  
+  .admin-nav a:hover {
+    background-color: #44475a;
+  }
+  
+  .admin-nav a.active {
+    background-color: #50fa7b;
+    color: #282a36;
+    font-weight: bold;
+  }
+  
+  .admin-toolbar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  
+  .search-container {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .search-container input {
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #44475a;
+    background-color: #282a36;
+    color: #f8f8f2;
+    width: 250px;
+  }
+  
+  .items-container {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .item-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+  
+  .item-card {
+    background-color: #282a36;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .item-header {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background-color: #44475a;
+  }
+  
+  .item-image {
+    width: 60px;
+    height: 60px;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-right: 15px;
+    background-color: #383a59;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .item-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  
+  .no-image {
+    color: #6272a4;
+    font-size: 0.8em;
+    text-align: center;
+  }
+  
+  .item-title {
+    flex-grow: 1;
+  }
+  
+  .item-name {
+    margin: 0;
+    color: #f8f8f2;
+    font-size: 1.3em;
+  }
+  
+  .item-type {
+    color: #8be9fd;
+    font-size: 0.9em;
+    text-transform: capitalize;
+  }
+  
+  .item-body {
+    padding: 15px;
+  }
+  
+  .item-description {
+    color: #bd93f9;
+    margin-bottom: 15px;
+  }
+  
+  .item-properties {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  
+  .item-property {
+    background-color: #44475a;
+    padding: 5px 10px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  
+  .property-label {
+    color: #6272a4;
+    font-size: 0.9em;
+  }
+  
+  .property-value {
+    color: #f8f8f2;
+    font-weight: bold;
+  }
+  
+  .item-effects {
+    background-color: #44475a;
+    padding: 10px;
+    border-radius: 5px;
+  }
+  
+  .item-effects h4 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    color: #ff79c6;
+    font-size: 1em;
+  }
+  
+  .effects-description {
+    color: #f8f8f2;
+    font-size: 0.9em;
+  }
+  
+  .item-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px;
+    background-color: #44475a;
+  }
+  
+  .item-form-container {
+    background-color: #282a36;
+    border-radius: 5px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .item-form-container h3 {
+    margin-top: 0;
+    color: #50fa7b;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #44475a;
+    padding-bottom: 10px;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 5px;
+    color: #bd93f9;
+  }
+  
+  input, textarea, select {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #44475a;
+    background-color: #383a59;
+    color: #f8f8f2;
+  }
+  
+  .radio-group {
+    display: flex;
+    gap: 20px;
+  }
+  
+  .radio-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+  }
+  
+  .radio-label input {
+    width: auto;
+  }
+  
+  .effects-container {
+    background-color: #383a59;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+  }
+  
+  .effects-container h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #ff79c6;
+  }
+  
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  
+  .admin-btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-size: 14px;
+    background-color: #6272a4;
+    color: #f8f8f2;
+  }
+  
+  .admin-btn:hover {
+    background-color: #7b88ad;
+  }
+  
+  .admin-btn.primary-btn {
+    background-color: #50fa7b;
+    color: #282a36;
+  }
+  
+  .admin-btn.primary-btn:hover {
+    background-color: #70fa9b;
+  }
+  
+  .admin-btn.danger-btn {
+    background-color: #ff5555;
+    color: #f8f8f2;
+  }
+  
+  .admin-btn.danger-btn:hover {
+    background-color: #ff6e6e;
+  }
+  
+  .loading, .error, .empty-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 20px;
+    color: #6272a4;
+  }
+  
+  .error {
+    color: #ff5555;
+  }
+  
+  .hidden {
+    display: none;
+  }
+</style> 

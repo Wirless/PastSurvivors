@@ -1,0 +1,52 @@
+<div class="error-container">
+  <div class="error-content">
+    <h1 class="glitch-text">403 - Access Denied</h1>
+    <p class="error-message"><%= message || 'You do not have permission to access this page.' %></p>
+    <div class="error-actions">
+      <a href="/dashboard" class="action-button glow-button">Back to Dashboard</a>
+      <a href="/" class="action-button outline-button">Home</a>
+    </div>
+  </div>
+</div>
+
+<style>
+  .error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+    text-align: center;
+  }
+  
+  .error-content {
+    background-color: rgba(20, 20, 30, 0.8);
+    padding: 2rem;
+    border-radius: 10px;
+    border: 1px solid #ff5555;
+    box-shadow: 0 0 20px rgba(255, 85, 85, 0.3);
+    max-width: 600px;
+  }
+  
+  .error-message {
+    font-size: 1.2rem;
+    color: #bd93f9;
+    margin: 1.5rem 0;
+  }
+  
+  .error-actions {
+    margin-top: 2rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+  }
+  
+  .outline-button {
+    background-color: transparent;
+    border: 1px solid #bd93f9;
+    color: #bd93f9;
+  }
+  
+  .outline-button:hover {
+    background-color: rgba(189, 147, 249, 0.2);
+  }
+</style> 

@@ -10,11 +10,15 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const characterRoutes = require('./routes/character');
 const inventoryRoutes = require('./routes/inventory');
+const scavengeRoutes = require('./routes/scavenge');
+const adminRoutes = require('./routes/admin');
+const adminApiRoutes = require('./routes/admin/api');
 
-// Import middleware
+// Import middleware and setup
 const { protect } = require('./middleware/auth');
 const { checkCharacterCreated, checkCharacterNotCreated } = require('./middleware/character');
 const ejsLayoutMiddleware = require('./middleware/ejsLayout');
+const { setupGame } = require('./controllers/setup');
 
 const app = express();
 
@@ -37,13 +41,22 @@ app.use(ejsLayoutMiddleware);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
+  .then(() => {
+    console.log('Connected to MongoDB');
+    // Setup game data including admin user and migrations
+    setupGame();
+  })
   .catch(err => console.error('MongoDB connection error:', err));
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/character', characterRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/scavenge', scavengeRoutes);
+app.use('/api/admin', adminApiRoutes);
+
+// Admin Routes
+app.use('/admin', adminRoutes);
 
 // Public Routes
 app.get('/', (req, res) => {
@@ -69,6 +82,10 @@ app.get('/dashboard', protect, checkCharacterCreated, (req, res) => {
 
 app.get('/inventory', protect, checkCharacterCreated, (req, res) => {
   res.render('inventory', { title: 'Inventory - Postapo Survival', user: req.user });
+});
+
+app.get('/scavenge', protect, checkCharacterCreated, (req, res) => {
+  res.render('scavenge', { title: 'Scavenge - Postapo Survival', user: req.user });
 });
 
 // Error handling middleware

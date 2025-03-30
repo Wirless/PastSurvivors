@@ -1,0 +1,957 @@
+<div class="container scavenge-container">
+  <div class="scavenge-header">
+    <h2 class="glitch-text">Scavenging</h2>
+    <p class="subtitle">Find resources and encounter dangers in the wasteland</p>
+  </div>
+
+  <div class="scavenge-content">
+    <div class="locations-section" id="locations-section">
+      <h3>Select Location</h3>
+      <div class="location-carousel">
+        <button class="carousel-btn prev-btn" id="prev-location-btn">&laquo;</button>
+        <div class="carousel-container" id="location-carousel">
+          <!-- Locations will be populated here via JavaScript -->
+          <div class="loading-indicator">Loading locations...</div>
+        </div>
+        <button class="carousel-btn next-btn" id="next-location-btn">&raquo;</button>
+      </div>
+      <div class="location-details" id="location-details">
+        <div class="location-description">Select a location to view details</div>
+        <div class="location-stats"></div>
+        <button class="action-button glow-button" id="start-scavenge-btn" disabled>Start Scavenging</button>
+      </div>
+    </div>
+
+    <div class="active-scavenge-section hidden" id="active-scavenge-section">
+      <h3>Currently Scavenging</h3>
+      <div class="active-location-info" id="active-location-info">
+        <!-- Active location info will be shown here -->
+      </div>
+      <div class="scavenge-progress">
+        <div class="scavenge-header-info">
+          <div class="elapsed-time-container">
+            <span class="elapsed-label">Time elapsed:</span>
+            <span class="elapsed-value" id="elapsed-time">0:00</span>
+          </div>
+          <div class="next-event-container">
+            <span class="next-event-label">Next event:</span>
+            <div class="next-event-progress-container">
+              <div class="next-event-progress" id="next-event-progress"></div>
+            </div>
+          </div>
+        </div>
+        <div class="scavenge-log-container">
+          <h4>Scavenge Log</h4>
+          <div class="scavenge-log" id="scavenge-log">
+            <!-- Scavenge logs will be added here -->
+          </div>
+        </div>
+        <div class="scavenge-loot-container">
+          <h4>Loot Found</h4>
+          <div class="scavenge-loot" id="scavenge-loot">
+            <!-- Loot will be added here -->
+          </div>
+        </div>
+        <button class="action-button danger-button" id="end-scavenge-btn">End Scavenging</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  // Elements
+  const locationCarousel = document.getElementById('location-carousel');
+  const locationDetails = document.getElementById('location-details');
+  const prevBtn = document.getElementById('prev-location-btn');
+  const nextBtn = document.getElementById('next-location-btn');
+  const startScavengeBtn = document.getElementById('start-scavenge-btn');
+  const endScavengeBtn = document.getElementById('end-scavenge-btn');
+  const locationsSection = document.getElementById('locations-section');
+  const activeScavengeSection = document.getElementById('active-scavenge-section');
+  const activeLocationInfo = document.getElementById('active-location-info');
+  const scavengeLog = document.getElementById('scavenge-log');
+  const scavengeLoot = document.getElementById('scavenge-loot');
+  const elapsedTimeDisplay = document.getElementById('elapsed-time');
+  
+  // State
+  let locations = [];
+  let currentLocationIndex = 0;
+  let isScavenging = false;
+  let scavengeStartTime = null;
+  let scavengeIntervalId = null;
+  let statusCheckIntervalId = null;
+  
+  // Load locations
+  try {
+    const response = await fetch('/api/scavenge/locations');
+    const data = await response.json();
+    
+    if (data.success && data.data.locations) {
+      locations = data.data.locations;
+      renderLocationCarousel();
+      updateLocationDetails();
+    } else {
+      locationCarousel.innerHTML = '<div class="error-message">Failed to load locations</div>';
+    }
+  } catch (error) {
+    console.error('Error loading locations:', error);
+    locationCarousel.innerHTML = '<div class="error-message">Error loading locations</div>';
+  }
+  
+  // Check if already scavenging
+  checkScavengeStatus();
+  
+  // Event listeners
+  prevBtn.addEventListener('click', () => {
+    if (currentLocationIndex > 0) {
+      currentLocationIndex--;
+      updateLocationDetails();
+    }
+  });
+  
+  nextBtn.addEventListener('click', () => {
+    if (currentLocationIndex < locations.length - 1) {
+      currentLocationIndex++;
+      updateLocationDetails();
+    }
+  });
+  
+  startScavengeBtn.addEventListener('click', startScavenging);
+  endScavengeBtn.addEventListener('click', endScavenging);
+  
+  // Functions
+  function renderLocationCarousel() {
+    if (locations.length === 0) {
+      locationCarousel.innerHTML = '<div class="error-message">No locations available</div>';
+      return;
+    }
+    
+    locationCarousel.innerHTML = '';
+    
+    locations.forEach((location, index) => {
+      const locationCard = document.createElement('div');
+      locationCard.className = `location-card ${index === currentLocationIndex ? 'active' : ''}`;
+      locationCard.dataset.index = index;
+      
+      locationCard.innerHTML = `
+        <div class="location-image">
+          <img src="${location.image}" alt="${location.name}">
+        </div>
+        <div class="location-name">${location.name}</div>
+      `;
+      
+      locationCard.addEventListener('click', () => {
+        document.querySelectorAll('.location-card').forEach(card => {
+          card.classList.remove('active');
+        });
+        locationCard.classList.add('active');
+        currentLocationIndex = index;
+        updateLocationDetails();
+      });
+      
+      locationCarousel.appendChild(locationCard);
+    });
+  }
+  
+  function updateLocationDetails() {
+    if (locations.length === 0) return;
+    
+    const location = locations[currentLocationIndex];
+    
+    // Update carousel active card
+    document.querySelectorAll('.location-card').forEach((card, index) => {
+      if (index === currentLocationIndex) {
+        card.classList.add('active');
+      } else {
+        card.classList.remove('active');
+      }
+    });
+    
+    // Update location details
+    locationDetails.innerHTML = `
+      <div class="location-name">${location.name}</div>
+      <div class="location-description">${location.description}</div>
+      <div class="location-stats">
+        <div class="location-stat">
+          <span class="stat-label">Energy Cost:</span>
+          <span class="stat-value">${location.energy_cost}</span>
+        </div>
+        <div class="location-stat">
+          <span class="stat-label">Minimum Level:</span>
+          <span class="stat-value">${location.min_level || 1}</span>
+        </div>
+      </div>
+      <button class="action-button glow-button" id="start-scavenge-btn">Start Scavenging</button>
+    `;
+    
+    // Re-attach event listener to the new button
+    document.getElementById('start-scavenge-btn').addEventListener('click', startScavenging);
+    
+    // Update prev/next buttons
+    prevBtn.disabled = currentLocationIndex === 0;
+    nextBtn.disabled = currentLocationIndex === locations.length - 1;
+  }
+  
+  async function startScavenging() {
+    if (locations.length === 0) return;
+    
+    const location = locations[currentLocationIndex];
+    
+    try {
+      const response = await fetch(`/api/scavenge/start/${location.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Switch to active scavenging view
+        isScavenging = true;
+        scavengeStartTime = Date.now();
+        
+        // Show active section, hide location selection
+        locationsSection.classList.add('hidden');
+        activeScavengeSection.classList.remove('hidden');
+        
+        // Display location info
+        activeLocationInfo.innerHTML = `
+          <div class="active-location-header">
+            <div class="active-location-image">
+              <img src="${location.image}" alt="${location.name}">
+            </div>
+            <div class="active-location-details">
+              <h4>${location.name}</h4>
+              <p>${location.description}</p>
+            </div>
+          </div>
+        `;
+        
+        // Start timer and periodic status checks
+        startScavengeTimer();
+        
+        // Start polling for updates
+        startPollingForUpdates();
+        
+        // Add initial log entry
+        addLogEntry(data.data.message || `Started scavenging at ${location.name}`);
+      } else {
+        alert(data.message || 'Failed to start scavenging');
+      }
+    } catch (error) {
+      console.error('Error starting scavenge:', error);
+      alert('Error starting scavenging session');
+    }
+  }
+  
+  async function endScavenging() {
+    try {
+      const response = await fetch('/api/scavenge/end', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Clear intervals
+        clearInterval(scavengeIntervalId);
+        clearInterval(statusCheckIntervalId);
+        
+        // Show results summary
+        const results = data.data.results;
+        
+        // Add a summary message to the log
+        const experienceGained = results.experienceGained || 0;
+        const lootCount = results.loot ? results.loot.length : 0;
+        
+        addLogEntry(`Scavenging session ended. Gained ${experienceGained} experience and found ${lootCount} items.`);
+        
+        // Update UI to show session ended
+        endScavengeBtn.disabled = true;
+        endScavengeBtn.textContent = 'Session Ended';
+        
+        // Add a button to return to location selection
+        const returnBtn = document.createElement('button');
+        returnBtn.className = 'action-button glow-button';
+        returnBtn.textContent = 'Return to Locations';
+        returnBtn.addEventListener('click', () => {
+          activeScavengeSection.classList.add('hidden');
+          locationsSection.classList.remove('hidden');
+          isScavenging = false;
+          checkScavengeStatus();  // Refresh status
+        });
+        
+        // Add the button after the end button
+        endScavengeBtn.parentNode.appendChild(returnBtn);
+      } else {
+        alert(data.message || 'Failed to end scavenging session');
+      }
+    } catch (error) {
+      console.error('Error ending scavenge:', error);
+      alert('Error ending scavenging session');
+    }
+  }
+  
+  function startScavengeTimer() {
+    scavengeIntervalId = setInterval(() => {
+      if (!scavengeStartTime) return;
+      
+      const elapsed = Date.now() - scavengeStartTime;
+      const minutes = Math.floor(elapsed / 60000);
+      const seconds = Math.floor((elapsed % 60000) / 1000);
+      
+      elapsedTimeDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }, 1000);
+  }
+  
+  async function checkScavengeStatus() {
+    try {
+      const response = await fetch('/api/scavenge/status');
+      const data = await response.json();
+      
+      if (data.success) {
+        if (data.data.active) {
+          // There's an active scavenging session
+          if (!isScavenging) {
+            // We just discovered an active session
+            isScavenging = true;
+            
+            // Show active section, hide location selection
+            locationsSection.classList.add('hidden');
+            activeScavengeSection.classList.remove('hidden');
+            
+            // Find the location in our list
+            const location = locations.find(loc => loc.id === data.data.locationId) || {
+              name: 'Unknown Location',
+              description: 'Details unavailable',
+              image: '/images/location-default.jpg'
+            };
+            
+            // Display location info
+            activeLocationInfo.innerHTML = `
+              <div class="active-location-header">
+                <div class="active-location-image">
+                  <img src="${location.image}" alt="${location.name}">
+                </div>
+                <div class="active-location-details">
+                  <h4>${location.name}</h4>
+                  <p>${location.description}</p>
+                </div>
+              </div>
+            `;
+            
+            // Set start time
+            scavengeStartTime = data.data.startTime;
+            
+            // Start timer
+            startScavengeTimer();
+            
+            // Start polling for updates
+            startPollingForUpdates();
+            
+            // Update the log and loot
+            updateScavengeLogs(data.data.logs);
+            updateScavengeLoot(data.data.loot);
+          } else {
+            // Update log
+            if (data.data.logs && data.data.logs.length > 0) {
+              updateScavengeLogs(data.data.logs);
+            }
+            
+            // Update loot
+            if (data.data.loot) {
+              updateScavengeLoot(data.data.loot);
+            }
+          }
+          
+          // Update next event countdown if available
+          if (data.data.nextEventIn !== null) {
+            updateNextEventCountdown(data.data.nextEventIn);
+          }
+        } else if (isScavenging) {
+          // Was scavenging but now it's over
+          isScavenging = false;
+          
+          // Stop timer and status checks
+          clearInterval(scavengeIntervalId);
+          clearInterval(statusCheckIntervalId);
+          
+          // Reset UI
+          showResultsView();
+        }
+      }
+    } catch (error) {
+      console.error('Error checking scavenge status:', error);
+    }
+  }
+  
+  function updateScavengeLogs(logs) {
+    if (!logs || !logs.length) return;
+    
+    // Clear existing logs and add all new ones
+    scavengeLog.innerHTML = '';
+    
+    logs.forEach(log => {
+      const logTime = new Date(log.time);
+      const timeString = `${logTime.getHours().toString().padStart(2, '0')}:${logTime.getMinutes().toString().padStart(2, '0')}`;
+      
+      const logEntry = document.createElement('div');
+      logEntry.className = 'log-entry';
+      logEntry.innerHTML = `
+        <span class="log-time">[${timeString}]</span>
+        <span class="log-message">${log.message}</span>
+      `;
+      
+      scavengeLog.appendChild(logEntry);
+    });
+    
+    // Scroll to bottom
+    scavengeLog.scrollTop = scavengeLog.scrollHeight;
+  }
+  
+  function updateScavengeLoot(loot) {
+    if (!loot || !loot.length) {
+      scavengeLoot.innerHTML = '<div class="no-loot">No items found yet</div>';
+      return;
+    }
+    
+    // Clear existing loot and add all new ones
+    scavengeLoot.innerHTML = '';
+    
+    loot.forEach(item => {
+      const lootEntry = document.createElement('div');
+      lootEntry.className = 'loot-entry';
+      lootEntry.innerHTML = `
+        <span class="loot-name">${item.item_id.replace(/_/g, ' ')}</span>
+        <span class="loot-quantity">x${item.quantity || 1}</span>
+      `;
+      
+      scavengeLoot.appendChild(lootEntry);
+    });
+  }
+  
+  function addLogEntry(message) {
+    const now = new Date();
+    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = 'log-entry';
+    logEntry.innerHTML = `
+      <span class="log-time">[${timeString}]</span>
+      <span class="log-message">${message}</span>
+    `;
+    
+    scavengeLog.appendChild(logEntry);
+    scavengeLog.scrollTop = scavengeLog.scrollHeight;
+  }
+  
+  // Update the next event countdown to use a progress bar instead of text
+  function updateNextEventCountdown(seconds) {
+    const progressBar = document.getElementById('next-event-progress');
+    const progressContainer = document.querySelector('.next-event-container');
+    
+    if (!progressBar || !progressContainer) return;
+    
+    if (seconds <= 0) {
+      progressBar.style.width = '100%';
+      progressContainer.classList.add('event-imminent');
+    } else {
+      // Get the max time between events (we know it's between 15-60 seconds from the controller)
+      const maxTime = 60;
+      // Calculate progress percentage (inverted - starts full and decreases)
+      const progressPercent = 100 - ((seconds / maxTime) * 100);
+      progressBar.style.width = `${progressPercent}%`;
+      progressContainer.classList.remove('event-imminent');
+    }
+  }
+  
+  // Increase status check frequency to update countdown more often
+  function startPollingForUpdates() {
+    // Clear any existing interval
+    if (statusCheckIntervalId) {
+      clearInterval(statusCheckIntervalId);
+    }
+    
+    // Set more frequent polling (every second) to keep countdown accurate
+    statusCheckIntervalId = setInterval(checkScavengeStatus, 1000);
+  }
+
+  // Add the missing showResultsView function
+  function showResultsView() {
+    // Clear any existing intervals
+    clearInterval(scavengeIntervalId);
+    clearInterval(statusCheckIntervalId);
+    
+    // Fetch the final results
+    fetch('/api/scavenge/end', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Update the UI with results
+        const results = data.data.results;
+        
+        // Create results view
+        const resultsContainer = document.createElement('div');
+        resultsContainer.className = 'scavenge-results-container';
+        
+        // Format duration
+        const minutes = Math.floor(results.duration / 60);
+        const seconds = results.duration % 60;
+        const durationText = `${minutes}m ${seconds}s`;
+        
+        // Format results
+        resultsContainer.innerHTML = `
+          <h3>Scavenging Results</h3>
+          <div class="results-summary">
+            <div class="result-item">
+              <span class="result-label">Duration:</span>
+              <span class="result-value">${durationText}</span>
+            </div>
+            <div class="result-item">
+              <span class="result-label">Experience Gained:</span>
+              <span class="result-value">${results.experienceGained || 0}</span>
+            </div>
+            <div class="result-item">
+              <span class="result-label">Items Found:</span>
+              <span class="result-value">${results.loot ? results.loot.length : 0}</span>
+            </div>
+          </div>
+          
+          <div class="results-sections">
+            <div class="results-section">
+              <h4>Scavenge Log</h4>
+              <div class="results-log">
+                ${results.logs.map(log => `<div class="log-entry">${log.message}</div>`).join('')}
+              </div>
+            </div>
+            
+            <div class="results-section">
+              <h4>Items Added to Inventory</h4>
+              <div class="results-items">
+                ${results.itemsAdded && results.itemsAdded.length > 0 ? 
+                  results.itemsAdded.map(item => `
+                    <div class="result-item-card">
+                      <img src="${item.image ? item.image.replace('/images/items/', '') : '/images/items/default-item.png'}" alt="${item.name}" class="item-image">
+                      <div class="item-info">
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-quantity">x${item.quantity}</div>
+                      </div>
+                    </div>
+                  `).join('') : 
+                  '<div class="empty-message">No items were added to inventory</div>'
+                }
+              </div>
+            </div>
+          </div>
+          
+          <div class="results-actions">
+            <button class="action-button glow-button" id="back-to-locations-btn">Back to Locations</button>
+          </div>
+        `;
+        
+        // Replace the active scavenge section with results
+        activeScavengeSection.innerHTML = '';
+        activeScavengeSection.appendChild(resultsContainer);
+        
+        // Add event listener to the back button
+        document.getElementById('back-to-locations-btn').addEventListener('click', () => {
+          // Reset UI
+          activeScavengeSection.classList.add('hidden');
+          locationsSection.classList.remove('hidden');
+          
+          // Reload the page to reset everything
+          window.location.reload();
+        });
+      } else {
+        alert(data.message || 'Failed to get scavenging results');
+        
+        // Reset UI
+        activeScavengeSection.classList.add('hidden');
+        locationsSection.classList.remove('hidden');
+      }
+    })
+    .catch(error => {
+      console.error('Error ending scavenge:', error);
+      alert('Error loading scavenging results');
+      
+      // Reset UI
+      activeScavengeSection.classList.add('hidden');
+      locationsSection.classList.remove('hidden');
+    });
+  }
+});
+</script>
+
+<style>
+.scavenge-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.scavenge-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.scavenge-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.location-carousel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.carousel-container {
+  display: flex;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  gap: 15px;
+  padding: 10px 0;
+  flex-grow: 1;
+}
+
+.location-card {
+  min-width: 150px;
+  height: 180px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #2a2a2a;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.location-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.location-card.active {
+  border: 2px solid #5aff5a;
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(90, 255, 90, 0.3);
+}
+
+.location-image {
+  height: 120px;
+  overflow: hidden;
+}
+
+.location-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.location-name {
+  padding: 10px;
+  text-align: center;
+  font-weight: bold;
+  color: #ccc;
+}
+
+.carousel-btn {
+  background-color: #333;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 20px;
+  transition: background-color 0.2s;
+}
+
+.carousel-btn:hover:not(:disabled) {
+  background-color: #444;
+}
+
+.carousel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.location-details {
+  background-color: #222;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.location-description {
+  margin-bottom: 15px;
+  color: #aaa;
+}
+
+.location-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.location-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+}
+
+.stat-label {
+  color: #888;
+}
+
+.stat-value {
+  color: #ddd;
+  font-weight: bold;
+}
+
+.active-scavenge-section {
+  background-color: #222;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.active-location-header {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.active-location-image {
+  width: 120px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.active-location-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.active-location-details {
+  flex-grow: 1;
+}
+
+.active-location-details h4 {
+  margin-top: 0;
+  color: #5aff5a;
+}
+
+.scavenge-log-container, .scavenge-loot-container {
+  margin-top: 20px;
+}
+
+.scavenge-log {
+  height: 200px;
+  overflow-y: auto;
+  border: 1px solid #333;
+  padding: 10px;
+  background-color: #1a1a1a;
+  border-radius: 4px;
+  font-family: monospace;
+  margin-bottom: 20px;
+}
+
+.log-entry {
+  margin-bottom: 5px;
+  line-height: 1.4;
+}
+
+.log-time {
+  color: #888;
+  margin-right: 5px;
+}
+
+.log-message {
+  color: #ddd;
+}
+
+.scavenge-loot {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.loot-entry {
+  background-color: #2a2a2a;
+  padding: 8px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.loot-name {
+  color: #ddd;
+  text-transform: capitalize;
+}
+
+.loot-quantity {
+  color: #5aff5a;
+  font-weight: bold;
+}
+
+.action-button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 20px;
+  font-size: 16px;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.glow-button {
+  background-color: #3a3a3a;
+  color: #5aff5a;
+  border: 1px solid #5aff5a;
+  box-shadow: 0 0 5px rgba(90, 255, 90, 0.5);
+}
+
+.glow-button:hover {
+  background-color: #2a2a2a;
+  box-shadow: 0 0 10px rgba(90, 255, 90, 0.7);
+}
+
+.danger-button {
+  background-color: #3a2a2a;
+  color: #ff5a5a;
+  border: 1px solid #ff5a5a;
+  box-shadow: 0 0 5px rgba(255, 90, 90, 0.5);
+}
+
+.danger-button:hover {
+  background-color: #2a1a1a;
+  box-shadow: 0 0 10px rgba(255, 90, 90, 0.7);
+}
+
+.hidden {
+  display: none;
+}
+
+.error-message {
+  color: #ff5a5a;
+  text-align: center;
+  padding: 10px;
+}
+
+.loading-indicator {
+  color: #888;
+  text-align: center;
+  padding: 20px;
+}
+
+.no-loot {
+  color: #888;
+  text-align: center;
+  grid-column: 1 / -1;
+  padding: 10px;
+}
+
+@media (max-width: 768px) {
+  .active-location-header {
+    flex-direction: column;
+  }
+  
+  .active-location-image {
+    width: 100%;
+    height: 180px;
+  }
+}
+
+.scavenge-header-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  width: 100%;
+  gap: 15px;
+}
+
+.next-event-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: rgba(30, 30, 40, 0.7);
+  border-radius: 5px;
+  border: 1px solid #44475a;
+  flex: 1;
+}
+
+.next-event-label {
+  color: #6272a4;
+  font-size: 0.9em;
+  margin-right: 5px;
+  white-space: nowrap;
+}
+
+.next-event-progress-container {
+  flex: 1;
+  height: 8px;
+  background-color: #282a36;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.next-event-progress {
+  height: 100%;
+  background: linear-gradient(90deg, #50fa7b, #8be9fd);
+  width: 0%;
+  transition: width 0.5s linear;
+}
+
+.event-imminent .next-event-progress {
+  background: linear-gradient(90deg, #ff5555, #ff79c6);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.elapsed-time-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.elapsed-label {
+  color: #6272a4;
+}
+
+.elapsed-value {
+  color: #f8f8f2;
+  font-weight: bold;
+}
+</style> 

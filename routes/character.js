@@ -1,12 +1,12 @@
 const express = require('express');
-const { createCharacter, getCharacter, updateCharacter } = require('../controllers/character');
 const { protect } = require('../middleware/auth');
+const { createCharacter, getCharacter, updateCharacterEnergy } = require('../controllers/character');
 
 const router = express.Router();
 
-router.route('/')
-  .post(protect, createCharacter)
-  .get(protect, getCharacter)
-  .put(protect, updateCharacter);
+// Protected routes
+router.post('/create', protect, createCharacter);
+router.get('/', protect, getCharacter);
+router.post('/updateEnergy', protect, updateCharacterEnergy);
 
 module.exports = router; 

@@ -17,6 +17,14 @@
         </div>
 
         <div class="stat-bar-container">
+          <div class="stat-label">Energy</div>
+          <div class="stat-bar-wrapper">
+            <div class="stat-bar energy-bar" id="energy-bar"></div>
+            <div class="stat-value" id="energy-value">--/--</div>
+          </div>
+        </div>
+
+        <div class="stat-bar-container">
           <div class="stat-label">Hunger</div>
           <div class="stat-bar-wrapper">
             <div class="stat-bar hunger-bar" id="hunger-bar"></div>
@@ -61,6 +69,10 @@
             <span class="attribute-label">LCK:</span>
             <span class="attribute-value" id="lck-value">--</span>
           </div>
+          <div class="attribute">
+            <span class="attribute-label">XP:</span>
+            <span class="attribute-value" id="exp-value">--</span>
+          </div>
         </div>
       </div>
     </div>
@@ -68,7 +80,7 @@
     <div class="dashboard-section actions-section">
       <h3>Actions</h3>
       <div class="action-buttons">
-        <button class="action-button glow-button" id="scavenge-btn">Scavenge</button>
+        <a href="/scavenge" class="action-button glow-button">Scavenge</a>
         <button class="action-button glow-button" id="rest-btn">Rest</button>
         <button class="action-button glow-button" id="explore-btn">Explore</button>
         <a href="/inventory" class="action-button glow-button">Inventory</a>
@@ -82,11 +94,150 @@
         <p class="no-effects">No active effects</p>
       </div>
     </div>
+    
+    <div class="dashboard-section rest-section hidden" id="rest-section">
+      <h3>Resting</h3>
+      <div class="rest-info">
+        <p>You are resting to recover energy.</p>
+        <div class="rest-timer">
+          <span>Next energy point in: </span>
+          <span id="rest-timer-value">00:00</span>
+        </div>
+        <div class="energy-gained">
+          <span>Energy gained: </span>
+          <span id="energy-gained-value">0</span>
+        </div>
+        <button class="action-button danger-button" id="stop-rest-btn">Stop Resting</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
+    // Get elements
+    const restBtn = document.getElementById('rest-btn');
+    const restSection = document.getElementById('rest-section');
+    const stopRestBtn = document.getElementById('stop-rest-btn');
+    const restTimerValue = document.getElementById('rest-timer-value');
+    const energyGainedValue = document.getElementById('energy-gained-value');
+    
+    // Rest functionality variables
+    let isResting = false;
+    let restStartTime = null;
+    let restInterval = null;
+    let energyGained = 0;
+    let lastEnergyGainTime = null;
+    
+    // Add rest functionality
+    restBtn.addEventListener('click', async () => {
+      try {
+        const character = await getCharacterData();
+        
+        if (character.energy.current >= character.energy.max) {
+          alert('Your energy is already full!');
+          return;
+        }
+        
+        // Start resting
+        isResting = true;
+        restStartTime = Date.now();
+        lastEnergyGainTime = restStartTime;
+        energyGained = 0;
+        
+        // Show rest section
+        restSection.classList.remove('hidden');
+        restBtn.disabled = true;
+        
+        // Start timer
+        restInterval = setInterval(updateRestTimer, 1000);
+      } catch (err) {
+        console.error('Error starting rest:', err);
+      }
+    });
+    
+    // Stop resting
+    stopRestBtn.addEventListener('click', () => {
+      stopResting();
+    });
+    
+    // Update rest timer
+    function updateRestTimer() {
+      if (!isResting) return;
+      
+      const now = Date.now();
+      const elapsed = now - lastEnergyGainTime;
+      const timeUntilNextPoint = 60000 - elapsed; // 1 minute = 60000ms
+      
+      if (timeUntilNextPoint <= 0) {
+        // Gain energy point
+        energyGained++;
+        energyGainedValue.textContent = energyGained;
+        lastEnergyGainTime = now;
+        
+        // Update character energy (optimistic update)
+        const energyBar = document.getElementById('energy-bar');
+        const energyValue = document.getElementById('energy-value');
+        
+        if (energyBar && energyValue) {
+          const [current, max] = energyValue.textContent.split('/').map(Number);
+          
+          if (!isNaN(current) && !isNaN(max) && current < max) {
+            const newEnergy = Math.min(current + 1, max);
+            const energyPercentage = (newEnergy / max) * 100;
+            
+            energyBar.style.width = `${energyPercentage}%`;
+            energyValue.textContent = `${newEnergy}/${max}`;
+            
+            // If energy is full, stop resting
+            if (newEnergy >= max) {
+              stopResting();
+              alert('Your energy is now full!');
+              return;
+            }
+          }
+        }
+      }
+      
+      // Update timer display
+      const minutes = Math.floor(timeUntilNextPoint / 60000);
+      const seconds = Math.floor((timeUntilNextPoint % 60000) / 1000);
+      restTimerValue.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    // Stop resting function
+    function stopResting() {
+      if (!isResting) return;
+      
+      isResting = false;
+      clearInterval(restInterval);
+      restSection.classList.add('hidden');
+      restBtn.disabled = false;
+      
+      // Update character data after resting
+      if (energyGained > 0) {
+        updateCharacterEnergy(energyGained);
+      }
+    }
+    
+    // Update character energy on server
+    async function updateCharacterEnergy(amount) {
+      try {
+        await fetch('/api/character/updateEnergy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ amount })
+        });
+        
+        // Reload character data to get updated stats
+        loadCharacterData();
+      } catch (err) {
+        console.error('Error updating energy:', err);
+      }
+    }
+    
     // Add debug functionality
     document.getElementById('debug-btn').addEventListener('click', async () => {
       try {
@@ -136,7 +287,8 @@ Try going to the inventory page again now.`);
       }
     });
     
-    try {
+    // Function to get character data
+    async function getCharacterData() {
       const res = await fetch('/api/character', {
         method: 'GET',
         headers: {
@@ -148,7 +300,18 @@ Try going to the inventory page again now.`);
       const data = await res.json();
       
       if (data.success) {
-        const character = data.data;
+        return data.data;
+      } else {
+        throw new Error('Failed to load character data');
+      }
+    }
+    
+    // Load character data on page load
+    loadCharacterData();
+    
+    async function loadCharacterData() {
+      try {
+        const character = await getCharacterData();
         
         // Update character name
         document.getElementById('char-name').textContent = character.name;
@@ -158,6 +321,12 @@ Try going to the inventory page again now.`);
         const healthPercentage = (character.health.current / character.health.max) * 100;
         healthBar.style.width = `${healthPercentage}%`;
         document.getElementById('health-value').textContent = `${character.health.current}/${character.health.max}`;
+        
+        // Update energy bar
+        const energyBar = document.getElementById('energy-bar');
+        const energyPercentage = (character.energy.current / character.energy.max) * 100;
+        energyBar.style.width = `${energyPercentage}%`;
+        document.getElementById('energy-value').textContent = `${character.energy.current}/${character.energy.max}`;
         
         // Update hunger bar
         const hungerBar = document.getElementById('hunger-bar');
@@ -194,25 +363,16 @@ Try going to the inventory page again now.`);
         document.getElementById('end-value').textContent = character.stats.endurance;
         document.getElementById('int-value').textContent = character.stats.intelligence;
         document.getElementById('lck-value').textContent = character.stats.luck;
+        document.getElementById('exp-value').textContent = character.experience;
         
         // Update status effects
         updateStatusEffects(character);
-      } else {
-        console.error('Failed to load character data');
+      } catch (err) {
+        console.error('Error loading character data:', err);
       }
-    } catch (err) {
-      console.error('Error loading character data:', err);
     }
     
     // Add event listeners for action buttons
-    document.getElementById('scavenge-btn').addEventListener('click', () => {
-      alert('Scavenging functionality will be implemented soon!');
-    });
-    
-    document.getElementById('rest-btn').addEventListener('click', () => {
-      alert('Resting functionality will be implemented soon!');
-    });
-    
     document.getElementById('explore-btn').addEventListener('click', () => {
       alert('Exploration functionality will be implemented soon!');
     });
@@ -224,6 +384,21 @@ Try going to the inventory page again now.`);
     statusEffectsContainer.innerHTML = '';
     
     const effects = [];
+    
+    // Check for energy effects
+    if (character.energy.current < 20) {
+      effects.push({
+        name: 'Exhausted',
+        description: 'Severely reduced effectiveness in all activities due to extreme fatigue.',
+        class: 'effect-critical'
+      });
+    } else if (character.energy.current < 40) {
+      effects.push({
+        name: 'Tired',
+        description: 'Reduced effectiveness in all activities due to fatigue.',
+        class: 'effect-warning'
+      });
+    }
     
     // Check for hunger effects
     if (character.hunger < 30) {
@@ -291,4 +466,46 @@ Try going to the inventory page again now.`);
       statusEffectsContainer.innerHTML = '<p class="no-effects">No active effects</p>';
     }
   }
-</script> 
+</script>
+
+<style>
+  .energy-bar {
+    background: linear-gradient(90deg, #3498db, #2980b9);
+  }
+  
+  .rest-section {
+    background-color: #222;
+    padding: 15px;
+    border-radius: 5px;
+  }
+  
+  .rest-info {
+    color: #aaa;
+  }
+  
+  .rest-timer, .energy-gained {
+    margin: 10px 0;
+    font-size: 1.1em;
+  }
+  
+  #rest-timer-value, #energy-gained-value {
+    color: #5aff5a;
+    font-weight: bold;
+  }
+  
+  .hidden {
+    display: none;
+  }
+  
+  .danger-button {
+    background-color: #3a2a2a;
+    color: #ff5a5a;
+    border: 1px solid #ff5a5a;
+    box-shadow: 0 0 5px rgba(255, 90, 90, 0.5);
+  }
+  
+  .danger-button:hover {
+    background-color: #2a1a1a;
+    box-shadow: 0 0 10px rgba(255, 90, 90, 0.7);
+  }
+</style> 

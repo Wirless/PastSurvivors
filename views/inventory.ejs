@@ -184,8 +184,12 @@
       if (equipment[slot]) {
         // Item is equipped
         const item = equipment[slot];
+        const imageSrc = item.image.startsWith('/images/items/') ? 
+          item.image : 
+          `/images/items/${item.image}`;
+        
         slotElement.innerHTML = `
-          <img src="/images/items/${item.image}" alt="${item.name}" class="equipped-item" data-item-id="${item._id}">
+          <img src="${imageSrc}" alt="${item.name}" class="equipped-item" data-item-id="${item._id}">
         `;
       } else {
         // Empty slot
@@ -212,9 +216,14 @@
         const inventoryItem = inventory[i];
         const item = inventoryItem.item;
         
+        // Fix image path to avoid duplication
+        const imageSrc = item.image.startsWith('/images/items/') ? 
+          item.image : 
+          `/images/items/${item.image}`;
+        
         inventorySlot.innerHTML = `
           <div class="item" data-inventory-id="${inventoryItem._id}" data-item-id="${item._id}">
-            <img src="/images/items/${item.image}" alt="${item.name}">
+            <img src="${imageSrc}" alt="${item.name}">
             ${inventoryItem.quantity > 1 ? `<div class="item-quantity">${inventoryItem.quantity}</div>` : ''}
           </div>
         `;
