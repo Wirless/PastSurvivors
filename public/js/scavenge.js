@@ -200,6 +200,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!activeLocation) return;
     
     try {
+      // First check if character is in recovery
+      const characterResponse = await fetch('/api/character');
+      const characterData = await characterResponse.json();
+      
+      if (characterData.success && characterData.data) {
+        const character = characterData.data;
+        
+        // Check if in recovery
+        if (character.recoveryUntil) {
+          const recoveryDate = new Date(character.recoveryUntil);
+          if (recoveryDate > new Date()) {
+            const minutesLeft = Math.ceil((recoveryDate - new Date()) / (1000 * 60));
+            showError(`You cannot scavenge while recovering from injuries. Recovery ends in ${minutesLeft} minutes.`);
+            return;
+          }
+        }
+        
+        // Check if enough energy
+        if (character.energy.current < activeLocation.energy_cost) {
+          showError(`Not enough energy to scavenge this location. You need ${activeLocation.energy_cost} energy.`);
+          return;
+        }
+      }
+      
       const response = await fetch(`/api/scavenge/start/${activeLocation.id}`, {
         method: 'POST',
         headers: {
@@ -211,10 +235,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       if (data.success) {
         isScavenging = true;
-        updateScavengingUI(true);
         scavengeStartTime = Date.now();
         
-        // Start the update interval
+        // Start interval for updates
         startScavengeInterval();
         
         // Update UI with initial data
@@ -222,10 +245,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           activeLocation = data.data.location;
         }
         
+        // Update UI for active scavenging
+        updateScavengingUI(true);
+        
         // Show toast
         showToast('Scavenging started!');
       } else {
-        showError(data.message || 'Could not start scavenging');
+        if (data.recovery) {
+          showError(`You cannot scavenge while recovering from injuries. Recovery ends in ${data.recovery.minutesLeft} minutes.`);
+        } else {
+          showError(data.message || 'Could not start scavenging');
+        }
       }
     } catch (error) {
       console.error('Error starting scavenging:', error);
@@ -600,9 +630,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const monsterNameElement = document.getElementById('monster-name');
     const monsterHealthBar = document.getElementById('monster-health-bar');
     const monsterHealthValue = document.getElementById('monster-health-value');
+    const monsterDamageStat = document.getElementById('monster-damage-stat');
+    const monsterXP = document.getElementById('monster-xp');
     
+    // Update monster name and stats
     if (monsterNameElement) monsterNameElement.textContent = monster.name;
+    if (monsterDamageStat) monsterDamageStat.textContent = monster.damage;
+    if (monsterXP) monsterXP.textContent = monster.experience;
     
+    // Update monster health
     if (monsterHealthBar && monsterHealthValue) {
       const monsterHealthPercent = (monster.currentHealth / monster.health) * 100;
       monsterHealthBar.style.width = `${Math.max(0, Math.min(100, monsterHealthPercent))}%`;
@@ -647,6 +683,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         combatStatusElement.textContent = 'You were knocked unconscious!';
       } else {
         combatStatusElement.textContent = `Combat in progress. Attack round: ${combat.rounds}`;
+      }
+    }
+    
+    // Update combat timer
+    const roundTimer = document.getElementById('round-timer');
+    if (roundTimer && combat.lastRound) {
+      const nextRoundTime = new Date(combat.lastRound + 2000); // 2 seconds after last round
+      const timeUntilNextRound = Math.max(0, nextRoundTime - Date.now());
+      const secondsLeft = Math.ceil(timeUntilNextRound / 1000);
+      roundTimer.textContent = `${secondsLeft}s`;
+      
+      // Make timer pulse when close to next round
+      if (secondsLeft <= 1) {
+        roundTimer.classList.add('pulse');
+      } else {
+        roundTimer.classList.remove('pulse');
       }
     }
   }
