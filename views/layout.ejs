@@ -21,6 +21,11 @@
           <li><a href="/">Home</a></li>
           <% if (typeof user !== 'undefined') { %>
             <li><a href="/dashboard">Dashboard</a></li>
+            <% if (user.role === 'admin') { %>
+              <li><a href="/admin/dashboard" class="admin-link">Admin Panel</a></li>
+            <% } else { %>
+              <li><a href="#" id="admin-access-btn" class="admin-link hidden">Admin Panel</a></li>
+            <% } %>
             <li><a href="/logout">Logout</a></li>
           <% } else { %>
             <li><a href="/login">Login</a></li>
@@ -39,8 +44,205 @@
     </footer>
   </div>
 
+  <!-- Admin Password Modal -->
+  <div id="admin-password-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal">&times;</span>
+      <h2>Admin Authentication</h2>
+      <p>Enter the admin password to access the admin panel:</p>
+      <div class="form-group">
+        <input type="password" id="admin-password-input" placeholder="Admin password">
+      </div>
+      <div class="modal-error hidden" id="admin-password-error">
+        Invalid admin password. Please try again.
+      </div>
+      <button id="submit-admin-password" class="glow-button">Submit</button>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
   <script src="/js/effects.js"></script>
   <script src="/js/main.js"></script>
+  
+  <style>
+    .admin-link {
+      color: #ff79c6 !important;
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      transition: all 0.3s ease;
+    }
+    
+    .admin-link:hover {
+      text-shadow: 0 0 8px rgba(255, 121, 198, 0.7);
+      background: rgba(255, 121, 198, 0.1);
+      border-radius: 3px;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal-content {
+      background-color: #282a36;
+      padding: 25px;
+      border: 1px solid #44475a;
+      border-radius: 5px;
+      width: 90%;
+      max-width: 500px;
+      position: relative;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    
+    .close-modal {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      color: #bd93f9;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    .close-modal:hover {
+      color: #ff79c6;
+    }
+    
+    .modal h2 {
+      color: #50fa7b;
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
+    
+    .modal p {
+      margin-bottom: 20px;
+      color: #f8f8f2;
+    }
+    
+    .modal .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .modal input {
+      width: 100%;
+      padding: 10px;
+      background-color: #44475a;
+      border: 1px solid #6272a4;
+      border-radius: 3px;
+      color: #f8f8f2;
+      font-family: 'Roboto Mono', monospace;
+    }
+    
+    .modal-error {
+      color: #ff5555;
+      margin-bottom: 15px;
+    }
+  </style>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Only run this code if the user is logged in but not an admin
+      const adminAccessBtn = document.getElementById('admin-access-btn');
+      if (adminAccessBtn) {
+        // Show the admin access button
+        adminAccessBtn.classList.remove('hidden');
+        
+        // Modal elements
+        const adminModal = document.getElementById('admin-password-modal');
+        const closeModalBtn = document.querySelector('.close-modal');
+        const submitPasswordBtn = document.getElementById('submit-admin-password');
+        const passwordInput = document.getElementById('admin-password-input');
+        const passwordError = document.getElementById('admin-password-error');
+        
+        // Open modal when admin button is clicked
+        adminAccessBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          adminModal.style.display = 'flex';
+          passwordInput.focus();
+          passwordError.classList.add('hidden');
+        });
+        
+        // Close modal when X is clicked
+        closeModalBtn.addEventListener('click', () => {
+          adminModal.style.display = 'none';
+          passwordInput.value = '';
+        });
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+          if (e.target === adminModal) {
+            adminModal.style.display = 'none';
+            passwordInput.value = '';
+          }
+        });
+        
+        // Submit password
+        submitPasswordBtn.addEventListener('click', checkAdminPassword);
+        passwordInput.addEventListener('keyup', (e) => {
+          if (e.key === 'Enter') {
+            checkAdminPassword();
+          }
+        });
+        
+        // Function to check admin password
+        async function checkAdminPassword() {
+          const password = passwordInput.value.trim();
+          
+          if (!password) {
+            passwordError.textContent = 'Please enter a password';
+            passwordError.classList.remove('hidden');
+            return;
+          }
+          
+          try {
+            const response = await fetch('/api/auth/check-admin-password', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ password })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              // Show success message
+              passwordError.textContent = 'Access granted! Redirecting...';
+              passwordError.style.color = '#50fa7b';
+              passwordError.classList.remove('hidden');
+              
+              // Wait a moment then redirect to admin dashboard
+              setTimeout(() => {
+                window.location.href = '/admin/dashboard';
+              }, 1000);
+            } else {
+              // Password is invalid
+              passwordError.textContent = data.message || 'Invalid admin password';
+              passwordError.style.color = '#ff5555';
+              passwordError.classList.remove('hidden');
+            }
+          } catch (error) {
+            console.error('Error checking admin password:', error);
+            passwordError.textContent = 'An error occurred. Please try again.';
+            passwordError.style.color = '#ff5555';
+            passwordError.classList.remove('hidden');
+          }
+        }
+      }
+    });
+  </script>
 </body>
 </html> 

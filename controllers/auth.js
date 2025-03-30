@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -174,6 +175,68 @@ exports.createAdminUser = async (req, res) => {
       success: true,
       message: 'Admin user created successfully',
       data: user
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
+// @desc    Check raw admin password
+// @route   POST /api/auth/check-admin-password
+// @access  Public
+exports.checkAdminPassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    // Validate password
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a password'
+      });
+    }
+    
+    // Check if password matches the hardcoded admin password
+    if (password === 'permadeath1') {
+      // If the user is logged in, update their role to admin
+      let token = null;
+      if (req.cookies && req.cookies.token) {
+        token = req.cookies.token;
+      } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        token = req.headers.authorization.split(' ')[1];
+      }
+      
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          const user = await User.findById(decoded.id);
+          
+          if (user) {
+            user.role = 'admin';
+            await user.save();
+            
+            // Send the updated token response for the user
+            return sendTokenResponse(user, 200, res);
+          }
+        } catch (err) {
+          console.error('JWT verification error:', err);
+          // Continue even if token verification fails
+        }
+      }
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Admin password is valid'
+      });
+    }
+    
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid admin password'
     });
   } catch (err) {
     console.error(err);
