@@ -5,7 +5,8 @@ const {
   getScavengeLocations, 
   startScavenge, 
   endScavenge, 
-  getScavengeStatus
+  getScavengeStatus,
+  triggerCombatRound
 } = require('../controllers/scavenge');
 
 const router = express.Router();
@@ -25,5 +26,8 @@ router.post('/end', endScavenge);
 
 // Get current scavenge status
 router.get('/status', getScavengeStatus);
+
+// Manually trigger a combat round
+router.post('/combat-round', triggerCombatRound);
 
 module.exports = router; 

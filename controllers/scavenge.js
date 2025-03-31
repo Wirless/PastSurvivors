@@ -327,15 +327,15 @@ exports.getScavengeStatus = asyncHandler(async (req, res) => {
     // Get the current next event time
     const nextEventTime = req.session.scavenging.nextEventTime;
     
-    // Check if it's time for a new event
-    if (elapsedSeconds >= nextEventTime && elapsedSeconds > lastProcessedTime) {
+    // Check if it's time for a new event - only if not in combat
+    if (elapsedSeconds >= nextEventTime && elapsedSeconds > lastProcessedTime && !req.session.scavenging.currentCombat) {
       console.log('Processing new event at', elapsedSeconds, 'seconds');
       await processScavengeEvent(req, location, elapsedSeconds);
       
       // Update the last processed time
       req.session.scavenging.lastProcessedTime = elapsedSeconds;
       
-      // Generate next event time (15-60 seconds from now)
+      // Generate next event time (5-15 seconds from now)
       const nextInterval = generateRandomEventInterval();
       req.session.scavenging.nextEventTime = elapsedSeconds + nextInterval;
       console.log('Next event in', nextInterval, 'seconds');
@@ -371,9 +371,9 @@ exports.getScavengeStatus = asyncHandler(async (req, res) => {
   }
 });
 
-// Function to generate a random time interval for events (15-60 seconds)
+// Function to generate a random time interval for events (5-15 seconds)
 function generateRandomEventInterval() {
-  return Math.floor(Math.random() * 46) + 15; // Random number between 15-60
+  return Math.floor(Math.random() * 11) + 5; // Random number between 5-15
 }
 
 // Function to generate the initial event time from start time
@@ -564,15 +564,12 @@ async function processCombatRound(req, character) {
     const combat = req.session.scavenging.currentCombat;
     const monster = combat.monster;
     
-    // Check if enough time has passed for another round (2 seconds)
+    // Record the time of this round
     const now = Date.now();
-    if (now - combat.lastRound < 2000) {
-      return; // Not time for next round yet
-    }
+    combat.lastRound = now;
     
     // Update the round counter
     combat.rounds += 1;
-    combat.lastRound = now;
     
     // Calculate player damage
     const playerDamage = Math.floor(Math.random() * 3) + character.stats.strength - 3;
@@ -586,6 +583,10 @@ async function processCombatRound(req, character) {
       time: now,
       message: `You hit the ${monster.name} for ${effectivePlayerDamage} damage.`
     });
+    
+    // Store new damage amounts for the UI
+    combat.newMonsterDamage = effectivePlayerDamage;
+    combat.newPlayerDamage = 0; // Will be set below if monster attacks
     
     // Check if monster is defeated
     if (monster.currentHealth <= 0) {
@@ -648,6 +649,7 @@ async function processCombatRound(req, character) {
     // Monster attacks
     const monsterDamage = Math.max(0, monster.damage);
     combat.monsterDamage = monsterDamage;
+    combat.newPlayerDamage = monsterDamage;
     
     if (monsterDamage > 0) {
       character.health.current -= monsterDamage;
@@ -695,4 +697,79 @@ async function processCombatRound(req, character) {
     console.error('Error processing combat round:', error);
     throw error;
   }
-} 
+}
+
+// @desc    Manually trigger a combat round
+// @route   POST /api/scavenge/combat-round
+// @access  Private
+exports.triggerCombatRound = asyncHandler(async (req, res) => {
+  try {
+    // Check if there's an active session
+    if (!req.session.scavenging) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active scavenging session'
+      });
+    }
+    
+    // Check if there's an active combat
+    if (!req.session.scavenging.currentCombat) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active combat in progress'
+      });
+    }
+    
+    // Get the character
+    const character = await Character.findOne({ user: req.user.id });
+    
+    if (!character) {
+      return res.status(404).json({
+        success: false,
+        message: 'Character not found'
+      });
+    }
+    
+    // Store the current state for comparison
+    const prevMonsterHealth = req.session.scavenging.currentCombat.monster.currentHealth;
+    const prevPlayerHealth = character.health.current;
+    
+    // Process a combat round
+    await processCombatRound(req, character);
+    
+    // Get updates after the combat round
+    const combat = req.session.scavenging.currentCombat;
+    
+    // Check if combat is still in progress
+    if (combat) {
+      // Calculate the damage dealt in this round for the UI
+      combat.newMonsterDamage = prevMonsterHealth - combat.monster.currentHealth;
+      combat.newPlayerDamage = prevPlayerHealth - character.health.current;
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          combat,
+          character
+        }
+      });
+    } else {
+      // Combat has ended
+      return res.status(200).json({
+        success: true,
+        data: {
+          combat: { ended: true },
+          character
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error triggering combat round:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not process combat round',
+      error: error.message
+    });
+  }
+}); 

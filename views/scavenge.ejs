@@ -33,6 +33,88 @@
   </div>
 
   <div class="scavenge-content">
+    <!-- Move combat window before the locations section for better readability -->
+    <div class="combat-window hidden" id="combat-window">
+      <h3>Combat Encounter</h3>
+      <div class="combat-status-indicator" id="combat-status-indicator">
+        <div class="combat-pause-message">Scavenging paused during combat</div>
+      </div>
+      <div class="combat-arena">
+        <div class="combat-entity player-entity">
+          <div class="entity-image" id="player-image">
+            <img src="/images/player/default-player.png" alt="Player">
+          </div>
+          <div class="entity-info">
+            <div class="entity-name" id="player-name">Player</div>
+            <div class="health-bar-container">
+              <div class="health-bar-label">HP:</div>
+              <div class="health-bar-wrapper">
+                <div class="health-bar player-health-bar" id="combat-player-health-bar"></div>
+              </div>
+              <div class="health-value" id="combat-player-health-value">0/0</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="combat-vs">VS</div>
+        
+        <div class="combat-entity monster-entity">
+          <div class="entity-image" id="monster-image">
+            <!-- Monster image will be displayed here -->
+          </div>
+          <div class="entity-info">
+            <div class="entity-name" id="combat-monster-name">Monster</div>
+            <div class="health-bar-container">
+              <div class="health-bar-label">HP:</div>
+              <div class="health-bar-wrapper">
+                <div class="health-bar monster-health-bar" id="combat-monster-health-bar"></div>
+              </div>
+              <div class="health-value" id="combat-monster-health-value">0/0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="combat-details">
+        <div class="monster-details">
+          <div class="monster-stats">
+            <div class="monster-stat">
+              <span class="stat-label">Damage:</span>
+              <span class="stat-value" id="combat-monster-damage">0</span>
+            </div>
+            <div class="monster-stat">
+              <span class="stat-label">XP Value:</span>
+              <span class="stat-value" id="combat-monster-xp">0</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="combat-info">
+          <div class="combat-round">Round: <span id="combat-round-count">0</span></div>
+          <div class="combat-damage-info">
+            <div class="damage-dealt">Your damage: <span id="combat-player-damage">0</span></div>
+            <div class="damage-received">Monster damage: <span id="combat-monster-damage-dealt">0</span></div>
+          </div>
+          <div class="combat-timer">Next round in: <span id="combat-round-timer">2s</span></div>
+        </div>
+      </div>
+      
+      <div class="combat-log-container">
+        <h4>Combat Log</h4>
+        <div class="combat-log" id="combat-log">
+          <!-- Combat logs will be added here -->
+        </div>
+      </div>
+      
+      <div class="combat-recovery hidden" id="combat-recovery">
+        <div class="recovery-message">You were defeated! Recovering...</div>
+        <div class="recovery-progress-container">
+          <div class="recovery-progress" id="recovery-progress"></div>
+        </div>
+        <div class="recovery-time" id="recovery-time">10:00</div>
+      </div>
+    </div>
+
     <div class="locations-section" id="locations-section">
       <h3>Select Location</h3>
       <div class="location-carousel">
@@ -65,57 +147,6 @@
             <span class="next-event-label">Next event:</span>
             <div class="next-event-progress-container">
               <div class="next-event-progress" id="next-event-progress"></div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- New Combat Panel -->
-        <div class="combat-panel hidden" id="combat-panel">
-          <h4>Combat Encounter</h4>
-          <div class="combat-content">
-            <div class="combat-entities">
-              <div class="combat-entity player">
-                <div class="combat-entity-name">You</div>
-                <div class="health-bar-container">
-                  <div class="health-bar player-health-bar" id="player-health-bar"></div>
-                </div>
-              </div>
-              <div class="combat-vs">VS</div>
-              <div class="combat-entity monster">
-                <div class="combat-entity-name" id="monster-name">Monster</div>
-                <div class="health-bar-container">
-                  <div class="health-bar-wrapper">
-                    <div class="health-bar monster-health-bar" id="monster-health-bar"></div>
-                  </div>
-                  <div class="health-value" id="monster-health-value">0/0</div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="combat-monster-container">
-              <div class="monster-image-container" id="monster-image-container">
-                <!-- Monster image will be displayed here -->
-              </div>
-              <div class="monster-stats">
-                <div class="monster-stat">
-                  <span class="stat-label">Damage:</span>
-                  <span class="stat-value" id="monster-damage-stat">0</span>
-                </div>
-                <div class="monster-stat">
-                  <span class="stat-label">XP Value:</span>
-                  <span class="stat-value" id="monster-xp">0</span>
-                </div>
-              </div>
-            </div>
-            
-            <div class="combat-info">
-              <div class="combat-round">Round: <span id="combat-round">0</span></div>
-              <div class="combat-damage">
-                <div class="player-damage">Your damage: <span id="player-damage">0</span></div>
-                <div class="monster-damage">Monster damage: <span id="monster-damage">0</span></div>
-              </div>
-              <div class="combat-status" id="combat-status">Combat in progress...</div>
-              <div class="combat-timer" id="combat-timer">Next round in: <span id="round-timer">2s</span></div>
             </div>
           </div>
         </div>
@@ -162,14 +193,37 @@ document.addEventListener('DOMContentLoaded', async () => {
   const recoveryStatusElement = document.getElementById('recovery-status');
   const recoveryTimeElement = document.getElementById('recovery-time');
   
+  // Combat elements
+  const combatWindow = document.getElementById('combat-window');
+  const combatPlayerHealthBar = document.getElementById('combat-player-health-bar');
+  const combatPlayerHealthValue = document.getElementById('combat-player-health-value');
+  const combatMonsterHealthBar = document.getElementById('combat-monster-health-bar');
+  const combatMonsterHealthValue = document.getElementById('combat-monster-health-value');
+  const combatMonsterName = document.getElementById('combat-monster-name');
+  const combatMonsterDamage = document.getElementById('combat-monster-damage');
+  const combatMonsterXP = document.getElementById('combat-monster-xp');
+  const combatRoundCount = document.getElementById('combat-round-count');
+  const combatPlayerDamage = document.getElementById('combat-player-damage');
+  const combatMonsterDamageDealt = document.getElementById('combat-monster-damage-dealt');
+  const combatRoundTimer = document.getElementById('combat-round-timer');
+  const combatLogContainer = document.getElementById('combat-log');
+  const playerName = document.getElementById('player-name');
+  const monsterImage = document.getElementById('monster-image');
+  const combatRecoverySection = document.getElementById('combat-recovery');
+  const recoveryProgress = document.getElementById('recovery-progress');
+  
   // State
   let locations = [];
   let currentLocationIndex = 0;
   let isScavenging = false;
+  let isInCombat = false;
   let scavengeStartTime = null;
   let scavengeIntervalId = null;
   let statusCheckIntervalId = null;
   let characterStatusIntervalId = null;
+  let recoveryEndTime = null;
+  let recoveryIntervalId = null;
+  let combatIntervalId = null; // Separate interval for combat updates
   
   // Load locations
   try {
@@ -331,6 +385,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
           }
         }
+        
+        // We no longer check energy requirements as they are removed
       }
       
       const response = await fetch(`/api/scavenge/start/${location.id}`, {
@@ -350,6 +406,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Show active section, hide location selection
         locationsSection.classList.add('hidden');
         activeScavengeSection.classList.remove('hidden');
+        
+        // Hide combat window if visible
+        if (combatWindow) {
+          combatWindow.classList.add('hidden');
+        }
         
         // Display location info
         activeLocationInfo.innerHTML = `
@@ -505,28 +566,43 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateScavengeLogs(data.data.logs);
             updateScavengeLoot(data.data.loot);
           } else {
-            // Update log
-            if (data.data.logs && data.data.logs.length > 0) {
+            // Update log if not in combat
+            if (!isInCombat && data.data.logs && data.data.logs.length > 0) {
               updateScavengeLogs(data.data.logs);
             }
             
-            // Update loot
-            if (data.data.loot) {
+            // Update loot if not in combat
+            if (!isInCombat && data.data.loot) {
               updateScavengeLoot(data.data.loot);
             }
           }
           
-          // Update next event countdown if available
-          if (data.data.nextEventIn !== null) {
+          // Handle combat in a separate flow
+          handleCombatState(data.data);
+          
+          // Update next event countdown if not in combat
+          if (data.data.nextEventIn !== null && !isInCombat) {
             updateNextEventCountdown(data.data.nextEventIn);
+          }
+          
+          // Check if player is in recovery
+          if (data.data.character && data.data.character.recoveryUntil) {
+            const recoveryDate = new Date(data.data.character.recoveryUntil);
+            if (recoveryDate > new Date()) {
+              startRecoveryCountdown(recoveryDate);
+            } else {
+              stopRecoveryCountdown();
+            }
           }
         } else if (isScavenging) {
           // Was scavenging but now it's over
           isScavenging = false;
+          isInCombat = false;
           
-          // Stop timer and status checks
+          // Stop all timers and status checks
           clearInterval(scavengeIntervalId);
           clearInterval(statusCheckIntervalId);
+          clearInterval(combatIntervalId);
           
           // Reset UI
           showResultsView();
@@ -537,13 +613,133 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
   
+  // New function to handle combat state separately
+  function handleCombatState(data) {
+    // Ensure we have valid combat data before proceeding
+    if (!data) return;
+    
+    // Check for combat state changes
+    if (data.currentCombat && data.currentCombat.monster && !isInCombat) {
+      // New combat started
+      isInCombat = true;
+      
+      // Stop scavenge polling to prevent interference
+      if (statusCheckIntervalId) {
+        clearInterval(statusCheckIntervalId);
+        statusCheckIntervalId = null;
+      }
+      
+      // Start combat
+      startCombat(data.currentCombat, data.character);
+      
+      // Start a separate combat status check
+      if (!combatIntervalId) {
+        // Use a more frequent interval for combat (every 1 second)
+        combatIntervalId = setInterval(updateCombatStatus, 1000);
+      }
+    } 
+    // Combat ended
+    else if (!data.currentCombat && isInCombat) {
+      isInCombat = false;
+      endCombat(data.character);
+      
+      // Clear combat interval
+      if (combatIntervalId) {
+        clearInterval(combatIntervalId);
+        combatIntervalId = null;
+      }
+      
+      // Restart scavenge polling
+      startPollingForUpdates();
+    }
+  }
+  
+  // New function to update combat status independently
+  async function updateCombatStatus() {
+    if (!isInCombat) {
+      if (combatIntervalId) {
+        clearInterval(combatIntervalId);
+        combatIntervalId = null;
+      }
+      return;
+    }
+    
+    try {
+      // Only use the regular status endpoint since we don't have a combat-specific one
+      const response = await fetch('/api/scavenge/status');
+      const data = await response.json();
+      
+      if (data.success) {
+        // Check if combat is still active
+        if (data.data.currentCombat && data.data.currentCombat.monster) {
+          // Get character health data (from either path in the response)
+          const character = data.data.character || 
+                           data.data.characterHealth || 
+                           { health: { current: 0, max: 100 } }; // Fallback
+          
+          // Update the combat display - don't update scavenging log
+          updateCombatDisplay(data.data.currentCombat, character);
+          
+          // Disable scavenging log updates during combat to prevent duplicate entries
+          if (statusCheckIntervalId) {
+            clearInterval(statusCheckIntervalId);
+            statusCheckIntervalId = null;
+          }
+        } else {
+          // Combat ended on server
+          isInCombat = false;
+          endCombat(data.data.character);
+          
+          // Clear interval
+          if (combatIntervalId) {
+            clearInterval(combatIntervalId);
+            combatIntervalId = null;
+          }
+          
+          // Restart scavenging updates
+          startPollingForUpdates();
+        }
+      }
+    } catch (error) {
+      console.error('Error updating combat status:', error);
+      
+      // If we reach this point, something is seriously wrong
+      // Add a failsafe to prevent locking the UI
+      if (error.message && error.message.includes('combat')) {
+        console.log('Recovering from combat error...');
+        
+        // Try to gracefully recover by ending combat mode
+        isInCombat = false;
+        
+        // Clear interval
+        if (combatIntervalId) {
+          clearInterval(combatIntervalId);
+          combatIntervalId = null;
+        }
+        
+        // Restart scavenging updates
+        startPollingForUpdates();
+        
+        // Show error message in the combat log if available
+        if (combatLogContainer) {
+          addCombatLogEntry('Error in combat system. Returning to scavenging...');
+        }
+      }
+    }
+  }
+  
   function updateScavengeLogs(logs) {
     if (!logs || !logs.length) return;
     
     // Clear existing logs and add all new ones
     scavengeLog.innerHTML = '';
     
-    logs.forEach(log => {
+    // Filter out combat logs if in combat
+    const filteredLogs = isInCombat 
+      ? logs.filter(log => !log.message.includes('attacks you') && !log.message.includes('You attack') && !log.message.includes('defeated'))
+      : logs;
+    
+    filteredLogs.forEach(log => {
       const logTime = new Date(log.time);
       const timeString = `${logTime.getHours().toString().padStart(2, '0')}:${logTime.getMinutes().toString().padStart(2, '0')}`;
       
@@ -624,11 +820,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       clearInterval(statusCheckIntervalId);
     }
     
-    // Set more frequent polling (every second) to keep countdown accurate
+    // Set more frequent polling (every 2 seconds) for general scavenging updates
     statusCheckIntervalId = setInterval(async () => {
-      await checkScavengeStatus();
+      // Only check general scavenging status if not in combat
+      // This prevents interference between combat and scavenging updates
+      if (!isInCombat) {
+        await checkScavengeStatus();
+      }
       
-      // Also update character status during scavenging
+      // Always update character status
       await updateCharacterStatus();
     }, 2000);
   }
@@ -802,6 +1002,279 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } catch (error) {
       console.error('Error updating character status:', error);
+    }
+  }
+
+  // Start combat mode
+  function startCombat(combat, character) {
+    if (!combatWindow || !combat || !combat.monster) return;
+    
+    // Ensure we pause the scavenging updates
+    if (statusCheckIntervalId) {
+      clearInterval(statusCheckIntervalId);
+      statusCheckIntervalId = null;
+    }
+    
+    // Show combat window with higher z-index
+    combatWindow.classList.remove('hidden');
+    combatWindow.style.zIndex = "100"; // Ensure it's on top
+    
+    // Set player name from character data
+    if (playerName) {
+      playerName.textContent = character?.name || 'Player';
+    }
+    
+    // Clear combat log
+    if (combatLogContainer) {
+      combatLogContainer.innerHTML = '';
+    }
+    
+    // Add a flashing effect to the combat window
+    combatWindow.classList.add('combat-flash');
+    setTimeout(() => {
+      combatWindow.classList.remove('combat-flash');
+    }, 500);
+    
+    // Add initial combat log entry
+    addCombatLogEntry(`Combat started! You encounter a ${combat.monster.name}!`);
+    
+    // Scroll to combat window with smooth animation
+    combatWindow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    // Update the combat display with character data
+    updateCombatDisplay(combat, character);
+  }
+  
+  // End combat
+  function endCombat(character) {
+    if (!combatWindow) return;
+    
+    // Add final combat log entry
+    addCombatLogEntry('Combat ended!');
+    
+    // Reset combat status
+    isInCombat = false;
+    
+    // Clear any combat interval
+    if (combatIntervalId) {
+      clearInterval(combatIntervalId);
+      combatIntervalId = null;
+    }
+    
+    // After a short delay, hide the combat window
+    setTimeout(() => {
+      combatWindow.classList.add('hidden');
+      
+      // Clear combat log
+      if (combatLogContainer) {
+        combatLogContainer.innerHTML = '';
+      }
+      
+      // Restart scavenging polling if we're still scavenging
+      if (isScavenging) {
+        startPollingForUpdates();
+      }
+    }, 2000);
+    
+    // Check if player died and needs recovery
+    if (character && character.recoveryUntil) {
+      const recoveryDate = new Date(character.recoveryUntil);
+      if (recoveryDate > new Date()) {
+        startRecoveryCountdown(recoveryDate);
+      }
+    }
+    
+    // Update character status
+    updateCharacterStatus();
+  }
+  
+  // Update combat display
+  function updateCombatDisplay(combat, character) {
+    if (!combatWindow || !combat || !combat.monster) return;
+    
+    const monster = combat.monster;
+    
+    // Update monster image
+    if (monsterImage) {
+      if (monster.image) {
+        monsterImage.innerHTML = `<img src="${monster.image}" alt="${monster.name}">`;
+      } else {
+        monsterImage.innerHTML = `<div class="monster-placeholder">${monster.name}</div>`;
+      }
+    }
+    
+    // Update monster name and stats
+    if (combatMonsterName) combatMonsterName.textContent = monster.name;
+    if (combatMonsterDamage) combatMonsterDamage.textContent = monster.damage || 0;
+    if (combatMonsterXP) combatMonsterXP.textContent = monster.experience || 0;
+    
+    // Update monster health
+    if (combatMonsterHealthBar && combatMonsterHealthValue) {
+      const monsterHealthPercent = (monster.currentHealth / monster.health) * 100;
+      combatMonsterHealthBar.style.width = `${Math.max(0, Math.min(100, monsterHealthPercent))}%`;
+      combatMonsterHealthValue.textContent = `${monster.currentHealth}/${monster.health}`;
+    }
+    
+    // Update player health using both combat-specific and global health bars
+    // This ensures we always show health consistently
+    if (character) {
+      // First try to extract health values regardless of data structure
+      let current, max;
+      
+      if (character.health && typeof character.health === 'object') {
+        // Health is in a nested object (preferred)
+        current = character.health.current;
+        max = character.health.max;
+      } else if (character.current !== undefined && character.max !== undefined) {
+        // Health is directly on the character
+        current = character.current;
+        max = character.max;
+      } else {
+        // Fallback values if nothing else works
+        // This prevents "cannot read property of undefined" errors
+        current = 0;
+        max = 100;
+      }
+      
+      // Make sure we have valid numbers
+      if (typeof current !== 'number') current = 0;
+      if (typeof max !== 'number') max = 100;
+      
+      // Calculate health percentage
+      const playerHealthPercent = (current / max) * 100;
+      
+      // Update combat-specific health bar
+      if (combatPlayerHealthBar && combatPlayerHealthValue) {
+        combatPlayerHealthBar.style.width = `${Math.max(0, Math.min(100, playerHealthPercent))}%`;
+        combatPlayerHealthValue.textContent = `${current}/${max}`;
+      }
+      
+      // Also update the global character health bar to keep them in sync
+      if (characterHealthBar && characterHealthValue) {
+        characterHealthBar.style.width = `${Math.max(0, Math.min(100, playerHealthPercent))}%`;
+        characterHealthValue.textContent = `${current}/${max}`;
+      }
+    }
+    
+    // Update combat round and damage info
+    if (combatRoundCount) combatRoundCount.textContent = combat.rounds || 0;
+    if (combatPlayerDamage) combatPlayerDamage.textContent = combat.playerDamage || 0;
+    if (combatMonsterDamageDealt) combatMonsterDamageDealt.textContent = combat.monsterDamage || 0;
+    
+    // Add combat log entries for new damage if available
+    if (combat.newPlayerDamage && combat.newPlayerDamage > 0) {
+      addCombatLogEntry(`${monster.name} attacks you for ${combat.newPlayerDamage} damage!`);
+    }
+    
+    if (combat.newMonsterDamage && combat.newMonsterDamage > 0) {
+      addCombatLogEntry(`You attack ${monster.name} for ${combat.newMonsterDamage} damage!`);
+    }
+    
+    // Check for combat victory or defeat
+    if (monster.currentHealth <= 0) {
+      addCombatLogEntry(`You defeated the ${monster.name}!`);
+    } else if (character && character.health && character.health.current <= 0) {
+      addCombatLogEntry(`You were defeated by the ${monster.name}! Starting recovery...`);
+    } else if (character && character.current !== undefined && character.current <= 0) {
+      addCombatLogEntry(`You were defeated by the ${monster.name}! Starting recovery...`);
+    }
+    
+    // Update combat timer if present
+    if (combatRoundTimer && combat.lastRound) {
+      const nextRoundTime = new Date(combat.lastRound + 2000); // 2 seconds after last round
+      const timeUntilNextRound = Math.max(0, nextRoundTime - Date.now());
+      const secondsLeft = Math.ceil(timeUntilNextRound / 1000);
+      combatRoundTimer.textContent = `${secondsLeft}s`;
+      
+      // Make timer pulse when close to next round
+      if (secondsLeft <= 1) {
+        combatRoundTimer.classList.add('pulse');
+      } else {
+        combatRoundTimer.classList.remove('pulse');
+      }
+    }
+  }
+  
+  // Add combat log entry
+  function addCombatLogEntry(message) {
+    if (!combatLogContainer) return;
+    
+    const now = new Date();
+    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = 'log-entry';
+    
+    // Apply appropriate classes based on message content
+    if (message.includes('defeated') || message.includes('success')) {
+      logEntry.classList.add('success');
+    } else if (message.includes('attacks you') || message.includes('damage')) {
+      logEntry.classList.add('danger');
+    }
+    
+    logEntry.innerHTML = `<span class="log-time">[${timeString}]</span> <span class="log-message">${message}</span>`;
+    combatLogContainer.appendChild(logEntry);
+    
+    // Scroll to the bottom
+    combatLogContainer.scrollTop = combatLogContainer.scrollHeight;
+  }
+  
+  // Start recovery countdown after player is defeated
+  function startRecoveryCountdown(recoveryEndTime) {
+    if (!combatRecoverySection || !recoveryProgress || !recoveryTimeElement) return;
+    
+    // Show recovery section
+    combatRecoverySection.classList.remove('hidden');
+    
+    // Clear any existing interval
+    if (recoveryIntervalId) {
+      clearInterval(recoveryIntervalId);
+    }
+    
+    // Update recovery UI function
+    const updateRecoveryUI = () => {
+      const now = new Date();
+      const timeDiff = recoveryEndTime - now;
+      
+      if (timeDiff <= 0) {
+        // Recovery complete
+        stopRecoveryCountdown();
+        alert('Recovery complete! Your health has been restored to 25 points.');
+        return;
+      }
+      
+      // Calculate progress percentage (from 0% to 100%)
+      const totalRecoveryTime = 10 * 60 * 1000; // 10 minutes in milliseconds
+      const elapsedTime = totalRecoveryTime - timeDiff;
+      const progressPercent = (elapsedTime / totalRecoveryTime) * 100;
+      
+      // Update progress bar
+      recoveryProgress.style.width = `${Math.min(100, progressPercent)}%`;
+      
+      // Update time display
+      const minutesLeft = Math.floor(timeDiff / 60000);
+      const secondsLeft = Math.floor((timeDiff % 60000) / 1000);
+      recoveryTimeElement.textContent = `${minutesLeft}:${secondsLeft.toString().padStart(2, '0')}`;
+    };
+    
+    // Update immediately
+    updateRecoveryUI();
+    
+    // Set interval for updates
+    recoveryIntervalId = setInterval(updateRecoveryUI, 1000);
+  }
+  
+  // Stop recovery countdown
+  function stopRecoveryCountdown() {
+    if (!combatRecoverySection) return;
+    
+    // Hide recovery section
+    combatRecoverySection.classList.add('hidden');
+    
+    // Clear interval
+    if (recoveryIntervalId) {
+      clearInterval(recoveryIntervalId);
+      recoveryIntervalId = null;
     }
   }
 });
@@ -1367,92 +1840,341 @@ document.addEventListener('DOMContentLoaded', async () => {
 .monster-stat {
   display: flex;
   justify-content: space-between;
-  color: #f8f8f2;
-  font-size: 0.9em;
+  margin-bottom: 5px;
 }
 
 .stat-label {
   color: #6272a4;
+  display: inline-block;
+  width: 70px; /* Fixed width for stat labels */
 }
 
 .stat-value {
   color: #ff79c6;
   font-weight: bold;
+  text-align: right;
+  margin-left: 10px;
+}
+
+.combat-damage-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.damage-dealt,
+.damage-received {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.damage-dealt {
+  color: #50fa7b;
+}
+
+.damage-received {
+  color: #ff5555;
 }
 
 .combat-info {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background-color: rgba(40, 42, 54, 0.3);
-  padding: 10px;
+  background-color: rgba(40, 42, 54, 0.5);
+  padding: 15px;
   border-radius: 5px;
 }
 
-.combat-round, .combat-damage {
-  display: flex;
-  justify-content: space-between;
-  color: #6272a4;
-  font-size: 0.9em;
-}
-
-.player-damage, .monster-damage {
-  flex: 1;
-}
-
-.player-damage {
-  color: #8be9fd;
-}
-
-.monster-damage {
-  color: #ff5555;
-  text-align: right;
-}
-
-.combat-status {
+.combat-round {
   text-align: center;
-  color: #f1fa8c;
-  font-style: italic;
-  margin-top: 5px;
-}
-
-/* Combat animation */
-@keyframes attack-pulse {
-  0% { transform: translateX(0); }
-  25% { transform: translateX(5px); }
-  75% { transform: translateX(-5px); }
-  100% { transform: translateX(0); }
-}
-
-.attacking {
-  animation: attack-pulse 0.5s ease;
-}
-
-/* Recovery countdown styles */
-.recovery-countdown {
-  margin-top: 5px;
-  padding: 5px;
-  background-color: rgba(255, 85, 85, 0.2);
-  border-radius: 3px;
-  text-align: center;
+  margin-bottom: 10px;
+  color: #f8f8f2;
   font-weight: bold;
-  color: #ff5555;
 }
 
-/* Disabled action button */
-.disabled-action {
-  cursor: not-allowed !important;
-  box-shadow: none !important;
-}
-
-/* Combat timer */
 .combat-timer {
   text-align: center;
   margin-top: 10px;
   padding: 5px;
-  background-color: rgba(40, 42, 54, 0.5);
-  border-radius: 3px;
+  background-color: #282a36;
+  border-radius: 5px;
+}
+
+#round-timer {
+  color: #f1fa8c;
+  font-weight: bold;
+}
+
+/* Pulse animation for combat timer */
+@keyframes pulse {
+  0% { color: #f1fa8c; }
+  50% { color: #ff5555; }
+  100% { color: #f1fa8c; }
+}
+
+.pulse {
+  animation: pulse 0.5s infinite;
+}
+
+/* Character Status Styles */
+.character-status-container {
+  background-color: #282a36;
+  border: 1px solid #44475a;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 10px rgba(80, 250, 123, 0.3);
+}
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+}
+
+.status-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.status-label {
   color: #6272a4;
+  font-size: 0.9em;
+}
+
+.status-bar-container {
+  width: 100%;
+}
+
+.status-bar-wrapper {
+  height: 10px;
+  background-color: #44475a;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
+.status-bar-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+.health-bar-fill {
+  background: linear-gradient(90deg, #8be9fd, #79e3fd);
+}
+
+.energy-bar-fill {
+  background: linear-gradient(90deg, #50fa7b, #8be9fd);
+}
+
+.status-value {
+  font-size: 0.8em;
+  color: #f8f8f2;
+  text-align: right;
+}
+
+.recovery-status {
+  background-color: rgba(255, 85, 85, 0.2);
+  padding: 8px;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.recovery-time {
+  color: #ff5555;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+@media (max-width: 768px) {
+  .status-bar {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+/* Combat Window Styles */
+.combat-window {
+  background-color: #1c1c24;
+  border: 2px solid #ff5555;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 0 15px rgba(255, 85, 85, 0.4);
+  position: relative;
+  z-index: 100; /* Higher z-index to ensure it appears above all other elements */
+}
+
+.combat-window.hidden {
+  display: none;
+}
+
+.combat-window h3 {
+  text-align: center;
+  color: #ff5555;
+  margin-top: 0;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 5px rgba(255, 85, 85, 0.5);
+}
+
+.combat-status-indicator {
+  background-color: rgba(255, 85, 85, 0.15);
+  text-align: center;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border: 1px solid rgba(255, 85, 85, 0.3);
+}
+
+.combat-pause-message {
+  color: #ff79c6;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+.combat-arena {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.combat-entity {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  background-color: rgba(40, 42, 54, 0.7);
+  border-radius: 8px;
+  position: relative;
+}
+
+.player-entity {
+  border-left: 4px solid #8be9fd;
+}
+
+.monster-entity {
+  border-left: 4px solid #ff5555;
+}
+
+.entity-image {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #282a36;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 2px solid #44475a;
+}
+
+.entity-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.entity-info {
+  width: 100%;
+  text-align: center;
+}
+
+.entity-name {
+  font-weight: bold;
+  color: #f8f8f2;
+  margin-bottom: 8px;
+  font-size: 1.1em;
+}
+
+.health-bar-label {
+  color: #6272a4;
+  font-size: 0.8em;
+  margin-bottom: 3px;
+}
+
+.combat-vs {
+  font-size: 1.8em;
+  font-weight: bold;
+  color: #ff79c6;
+  text-shadow: 0 0 5px #ff5555;
+  animation: pulse 2s infinite;
+}
+
+.combat-details {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.monster-details, .combat-info {
+  flex: 1;
+  background-color: rgba(40, 42, 54, 0.5);
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.monster-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.combat-damage-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.damage-dealt,
+.damage-received {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.damage-dealt {
+  color: #50fa7b;
+}
+
+.damage-received {
+  color: #ff5555;
+}
+
+.combat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: rgba(40, 42, 54, 0.5);
+  padding: 15px;
+  border-radius: 5px;
+}
+
+.combat-round {
+  text-align: center;
+  margin-bottom: 10px;
+  color: #f8f8f2;
+  font-weight: bold;
+}
+
+.combat-timer {
+  text-align: center;
+  margin-top: 10px;
+  padding: 5px;
+  background-color: #282a36;
+  border-radius: 5px;
 }
 
 #round-timer {
