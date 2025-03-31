@@ -6,7 +6,8 @@ const {
   startScavenge, 
   endScavenge, 
   getScavengeStatus,
-  triggerCombatRound
+  triggerCombatRound,
+  forceEncounter
 } = require('../controllers/scavenge');
 
 const router = express.Router();
@@ -29,5 +30,8 @@ router.get('/status', getScavengeStatus);
 
 // Manually trigger a combat round
 router.post('/combat-round', triggerCombatRound);
+
+// Add the force combat route to the scavenge routes
+router.post('/force-combat/:monsterId', forceEncounter);
 
 module.exports = router; 

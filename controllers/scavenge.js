@@ -275,6 +275,7 @@ exports.endScavenge = asyncHandler(async (req, res) => {
 // @access  Private
 exports.getScavengeStatus = asyncHandler(async (req, res) => {
   try {
+    // Check if there's an active scavenging session
     if (!req.session.scavenging) {
       return res.status(200).json({
         success: true,
@@ -315,21 +316,22 @@ exports.getScavengeStatus = asyncHandler(async (req, res) => {
     const startTime = req.session.scavenging.startTime;
     const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
     
-    // Check if there are new events to process
-    const lastProcessedTime = req.session.scavenging.lastProcessedTime || 0;
-    
-    // Initialize nextEventTime if it doesn't exist
+    // Check if there are new events to process - regardless of combat status
+    // Initialize event timing if needed
     if (!req.session.scavenging.nextEventTime) {
-      // Initialize with a time 5-20 seconds from the start
       req.session.scavenging.nextEventTime = generateRandomEventTime(startTime);
     }
     
-    // Get the current next event time
+    const lastProcessedTime = req.session.scavenging.lastProcessedTime || 0;
     const nextEventTime = req.session.scavenging.nextEventTime;
     
-    // Check if it's time for a new event - only if not in combat
-    if (elapsedSeconds >= nextEventTime && elapsedSeconds > lastProcessedTime && !req.session.scavenging.currentCombat) {
-      console.log('Processing new event at', elapsedSeconds, 'seconds');
+    // Process an event if it's time, even if we're in combat
+    // This ensures we don't miss combat encounters
+    // If combat is active, the processScavengeEvent function will handle it appropriately
+    if (elapsedSeconds >= nextEventTime && elapsedSeconds > lastProcessedTime) {
+      console.log(`Processing new event at ${elapsedSeconds} seconds`);
+      
+      // Process the event
       await processScavengeEvent(req, location, elapsedSeconds);
       
       // Update the last processed time
@@ -338,14 +340,24 @@ exports.getScavengeStatus = asyncHandler(async (req, res) => {
       // Generate next event time (5-15 seconds from now)
       const nextInterval = generateRandomEventInterval();
       req.session.scavenging.nextEventTime = elapsedSeconds + nextInterval;
-      console.log('Next event in', nextInterval, 'seconds');
+      
+      console.log(`Next event scheduled in ${nextInterval} seconds`);
     }
     
-    // Calculate seconds until next event
-    const secondsUntilNextEvent = req.session.scavenging.nextEventTime 
-                                ? Math.max(0, req.session.scavenging.nextEventTime - elapsedSeconds)
-                                : null;
+    // Calculate seconds until next event (only if not in combat)
+    let secondsUntilNextEvent = null;
+    if (!req.session.scavenging.currentCombat && req.session.scavenging.nextEventTime) {
+      secondsUntilNextEvent = Math.max(0, req.session.scavenging.nextEventTime - elapsedSeconds);
+    }
     
+    // Prepare character health data for the client
+    const characterHealth = character ? {
+      health: character.health,
+      name: character.name,
+      recoveryUntil: character.recoveryUntil
+    } : null;
+    
+    // Send response
     res.status(200).json({
       success: true,
       data: {
@@ -354,11 +366,11 @@ exports.getScavengeStatus = asyncHandler(async (req, res) => {
         location,
         startTime,
         elapsedTime: Date.now() - startTime,
-        logs: req.session.scavenging.logs,
+        logs: req.session.scavenging.logs || [],
         loot: req.session.scavenging.loot || [],
         nextEventIn: secondsUntilNextEvent,
         currentCombat: req.session.scavenging.currentCombat,
-        characterHealth: character ? character.health : null
+        character: characterHealth
       }
     });
   } catch (error) {
@@ -404,8 +416,9 @@ async function processScavengeEvent(req, location, elapsedSeconds) {
     
     // Check if there's an active combat
     if (req.session.scavenging.currentCombat) {
-      // Process combat round
-      await processCombatRound(req, character);
+      console.log("Combat is active, skipping normal event processing");
+      // Don't actually skip event processing, just don't generate a new event
+      // We still want to process combat rounds regularly via the combat round API
       return;
     }
     
@@ -448,7 +461,9 @@ async function processScavengeEvent(req, location, elapsedSeconds) {
             monsterDamage: 0
           };
           
-          // Return early - combat will be processed in next status check
+          console.log(`Combat initialized with ${monster.name}`);
+          
+          // Return early - combat will be processed via combat round API
           return;
         } else if (encounter.type === 'item') {
           // Item encounter - find some loot
@@ -557,146 +572,243 @@ async function processScavengeEvent(req, location, elapsedSeconds) {
 // Process combat round in scavenging
 async function processCombatRound(req, character) {
   try {
+    // Validate combat exists
     if (!req.session.scavenging || !req.session.scavenging.currentCombat) {
-      return;
+      console.error("No combat in session");
+      return false;
     }
     
     const combat = req.session.scavenging.currentCombat;
     const monster = combat.monster;
     
-    // Record the time of this round
+    console.log(`Processing combat round for ${monster.name}, health: ${monster.currentHealth}/${monster.health}`);
+    
+    // Round timing
     const now = Date.now();
     combat.lastRound = now;
     
-    // Update the round counter
-    combat.rounds += 1;
+    // Initialize or increment round counter
+    if (combat.rounds === undefined) {
+      combat.rounds = 1; // Start at round 1
+    } else {
+      combat.rounds += 1;
+    }
     
-    // Calculate player damage
-    const playerDamage = Math.floor(Math.random() * 3) + character.stats.strength - 3;
-    const effectivePlayerDamage = Math.max(1, playerDamage);
-    combat.playerDamage = effectivePlayerDamage;
+    console.log(`Combat round ${combat.rounds} started`);
     
-    // Player attacks
-    monster.currentHealth -= effectivePlayerDamage;
+    // Reset damage for this round
+    combat.newMonsterDamage = 0;
+    combat.newPlayerDamage = 0;
     
+    // PLAYER ATTACKS FIRST
+    
+    // Calculate player damage with strength and equipped weapon
+    let weaponDamage = 0;
+    
+    // Get weapon damage if character has a weapon equipped
+    if (character.equipment && character.equipment.weapon) {
+      try {
+        // Populate the weapon item if not already populated
+        if (typeof character.equipment.weapon === 'string' || !character.equipment.weapon.stats) {
+          const weapon = await Item.findById(character.equipment.weapon);
+          if (weapon && weapon.stats && weapon.stats.damage) {
+            weaponDamage = weapon.stats.damage;
+          }
+        } else if (character.equipment.weapon.stats && character.equipment.weapon.stats.damage) {
+          // If already populated
+          weaponDamage = character.equipment.weapon.stats.damage;
+        }
+        console.log(`Weapon damage: ${weaponDamage}`);
+      } catch (err) {
+        console.error("Error getting weapon damage:", err);
+      }
+    }
+    
+    // Calculate player damage with randomness (1-3 base + strength + weapon damage)
+    const strengthBonus = character.stats && character.stats.strength ? character.stats.strength : 1;
+    const baseDamage = Math.floor(Math.random() * 3) + 1; // 1-3 damage
+    const playerDamage = Math.max(1, baseDamage + strengthBonus + weaponDamage); // Minimum 1 damage
+    
+    // Update damage values for UI
+    combat.playerDamage = playerDamage;
+    combat.newMonsterDamage = playerDamage;
+    
+    // Apply damage to monster
+    monster.currentHealth -= playerDamage;
+    
+    console.log(`Player hits for ${playerDamage} (Strength: ${strengthBonus}, Weapon: ${weaponDamage}), monster health now ${monster.currentHealth}/${monster.health}`);
+    
+    // Log the attack
     req.session.scavenging.logs.push({
       time: now,
-      message: `You hit the ${monster.name} for ${effectivePlayerDamage} damage.`
+      message: `You hit the ${monster.name} for ${playerDamage} damage.`
     });
-    
-    // Store new damage amounts for the UI
-    combat.newMonsterDamage = effectivePlayerDamage;
-    combat.newPlayerDamage = 0; // Will be set below if monster attacks
     
     // Check if monster is defeated
     if (monster.currentHealth <= 0) {
-      req.session.scavenging.logs.push({
-        time: now,
-        message: `You defeated the ${monster.name}!`
-      });
-      
-      // Rewards
-      // Experience gain
-      character.experience += monster.experience;
-      req.session.scavenging.experienceGained += monster.experience;
-      req.session.scavenging.logs.push({
-        time: now,
-        message: `You gained ${monster.experience} experience!`
-      });
-      
-      // Loot drop 
-      if (monster.loot && monster.loot.length > 0) {
-        for (const lootItem of monster.loot) {
-          const lootRoll = Math.random() * 100;
-          
-          if (lootRoll <= lootItem.chance) {
-            // Verify the item exists in the database
-            const itemExists = await Item.findOne({ itemId: lootItem.item_id });
-            
-            if (itemExists) {
-              req.session.scavenging.logs.push({
-                time: now,
-                message: `You found ${itemExists.name}!`
-              });
-              
-              // Add to loot
-              const existingLoot = req.session.scavenging.loot.find(
-                item => item.item_id === lootItem.item_id
-              );
-              
-              if (existingLoot) {
-                existingLoot.quantity = (existingLoot.quantity || 1) + 1;
-              } else {
-                req.session.scavenging.loot.push({
-                  item_id: lootItem.item_id,
-                  name: itemExists.name,
-                  quantity: 1
-                });
-              }
-            } else {
-              console.warn(`Item with ID ${lootItem.item_id} not found in database`);
-            }
-          }
-        }
-      }
-      
-      // End combat
-      req.session.scavenging.currentCombat = null;
-      await character.save();
-      return;
+      await handleMonsterDefeat(req, combat, monster, character, now);
+      return true;
     }
     
-    // Monster attacks
-    const monsterDamage = Math.max(0, monster.damage);
+    // MONSTER ATTACKS NEXT
+    
+    // Calculate monster damage with randomness (0 to monster damage value)
+    const monsterDamage = monster.damage > 0 ? Math.floor(Math.random() * (monster.damage + 1)) : 0;
+    
+    // Update damage values for UI
     combat.monsterDamage = monsterDamage;
     combat.newPlayerDamage = monsterDamage;
     
+    console.log(`Monster attempts to hit for up to ${monster.damage}, rolls ${monsterDamage}`);
+    
+    // Apply and log monster attack
     if (monsterDamage > 0) {
+      // Apply damage to player
       character.health.current -= monsterDamage;
+      
+      console.log(`Monster hits for ${monsterDamage}, player health now ${character.health.current}/${character.health.max}`);
+      
+      // Log the attack
       req.session.scavenging.logs.push({
         time: now,
         message: `The ${monster.name} attacks you for ${monsterDamage} damage!`
       });
       
-      // Check if player died
+      // Check if player is defeated
       if (character.health.current <= 0) {
-        // Set recovery period (10 minutes)
-        const recoveryTime = new Date();
-        recoveryTime.setMinutes(recoveryTime.getMinutes() + 10);
-        character.recoveryUntil = recoveryTime;
-        
-        // Set health to 1 for now (will be set to 25 when recovery ends)
-        character.health.current = 1;
-        
-        req.session.scavenging.logs.push({
-          time: now,
-          message: `You were knocked unconscious! You will be in recovery for 10 minutes.`
-        });
-        
-        // End scavenging session after this event
-        req.session.scavenging.logs.push({
-          time: now,
-          message: `You need to rest and recover your strength.`
-        });
-        
-        // End combat
-        req.session.scavenging.currentCombat = null;
-        
-        // Flag session to end
-        req.session.scavenging.shouldEnd = true;
+        await handlePlayerDefeat(req, combat, monster, character, now);
+        return true;
       }
     } else {
+      // Monster missed
       req.session.scavenging.logs.push({
         time: now,
         message: `The ${monster.name} tries to attack but misses!`
       });
     }
     
+    // Save character changes (health updates)
     await character.save();
+    
+    console.log(`Combat round ${combat.rounds} completed successfully`);
+    return true;
   } catch (error) {
     console.error('Error processing combat round:', error);
-    throw error;
+    return false;
   }
+}
+
+// Handle monster defeat
+async function handleMonsterDefeat(req, combat, monster, character, timestamp) {
+  console.log(`Monster ${monster.name} defeated`);
+  
+  // Log victory
+  req.session.scavenging.logs.push({
+    time: timestamp,
+    message: `You defeated the ${monster.name}!`
+  });
+  
+  // Award experience
+  const expGained = monster.experience || 1;
+  character.experience += expGained;
+  
+  // Track experience in session
+  if (!req.session.scavenging.experienceGained) {
+    req.session.scavenging.experienceGained = expGained;
+  } else {
+    req.session.scavenging.experienceGained += expGained;
+  }
+  
+  // Log experience gain
+  req.session.scavenging.logs.push({
+    time: timestamp,
+    message: `You gained ${expGained} experience!`
+  });
+  
+  // Process monster loot drops
+  if (monster.loot && monster.loot.length > 0) {
+    for (const lootItem of monster.loot) {
+      // Roll for each potential loot item
+      const lootRoll = Math.random() * 100;
+      
+      if (lootRoll <= lootItem.chance) {
+        // Check if item exists in database
+        const itemExists = await Item.findOne({ itemId: lootItem.item_id });
+        
+        if (itemExists) {
+          // Log item find
+          req.session.scavenging.logs.push({
+            time: timestamp,
+            message: `You found ${itemExists.name}!`
+          });
+          
+          // Add to session loot
+          const existingLoot = req.session.scavenging.loot.find(
+            item => item.item_id === lootItem.item_id
+          );
+          
+          if (existingLoot) {
+            existingLoot.quantity = (existingLoot.quantity || 1) + 1;
+          } else {
+            req.session.scavenging.loot.push({
+              item_id: lootItem.item_id,
+              name: itemExists.name,
+              quantity: 1
+            });
+          }
+        } else {
+          console.warn(`Item with ID ${lootItem.item_id} not found in database`);
+        }
+      }
+    }
+  }
+  
+  // End combat
+  combat.ended = true;
+  req.session.scavenging.currentCombat = null;
+  
+  // Save character with experience update
+  await character.save();
+  
+  console.log('Monster defeat processed, combat ended');
+  return true;
+}
+
+// Handle player defeat
+async function handlePlayerDefeat(req, combat, monster, character, timestamp) {
+  console.log(`Player defeated by ${monster.name}`);
+  
+  // Set recovery period (10 minutes)
+  const recoveryTime = new Date();
+  recoveryTime.setMinutes(recoveryTime.getMinutes() + 10);
+  character.recoveryUntil = recoveryTime;
+  
+  // Set health to 1 (will be restored to 25% after recovery)
+  character.health.current = 1;
+  
+  // Log defeat and recovery
+  req.session.scavenging.logs.push({
+    time: timestamp,
+    message: `You were knocked unconscious by the ${monster.name}!`
+  });
+  
+  req.session.scavenging.logs.push({
+    time: timestamp,
+    message: `You will be in recovery for 10 minutes.`
+  });
+  
+  // End combat
+  combat.ended = true;
+  req.session.scavenging.currentCombat = null;
+  
+  // Flag session to end
+  req.session.scavenging.shouldEnd = true;
+  
+  // Save character with recovery time
+  await character.save();
+  
+  console.log('Player defeat processed, recovery started');
+  return true;
 }
 
 // @desc    Manually trigger a combat round
@@ -704,8 +816,11 @@ async function processCombatRound(req, character) {
 // @access  Private
 exports.triggerCombatRound = asyncHandler(async (req, res) => {
   try {
+    console.log("Combat round request received from client");
+    
     // Check if there's an active session
     if (!req.session.scavenging) {
+      console.error("No active scavenging session found in session");
       return res.status(400).json({
         success: false,
         message: 'No active scavenging session'
@@ -714,13 +829,115 @@ exports.triggerCombatRound = asyncHandler(async (req, res) => {
     
     // Check if there's an active combat
     if (!req.session.scavenging.currentCombat) {
+      console.error("No active combat found in session");
       return res.status(400).json({
         success: false,
         message: 'No active combat in progress'
       });
     }
     
+    // Check if combat data is valid
+    if (!req.session.scavenging.currentCombat.monster) {
+      console.error("Invalid combat data - missing monster");
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid combat data'
+      });
+    }
+    
     // Get the character
+    const character = await Character.findOne({ user: req.user.id });
+    
+    if (!character) {
+      console.error("Character not found");
+      return res.status(404).json({
+        success: false,
+        message: 'Character not found'
+      });
+    }
+    
+    console.log(`Processing combat round for character: ${character.name}, monster: ${req.session.scavenging.currentCombat.monster.name}`);
+    console.log("Combat state before processing:", JSON.stringify(req.session.scavenging.currentCombat));
+    
+    // Process a combat round
+    try {
+      const roundProcessed = await processCombatRound(req, character);
+      
+      if (!roundProcessed) {
+        console.error("Failed to process combat round");
+        return res.status(400).json({
+          success: false,
+          message: 'Failed to process combat round'
+        });
+      }
+    } catch (error) {
+      console.error("Error in processCombatRound:", error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error in combat processing',
+        error: error.message
+      });
+    }
+    
+    console.log("Combat state after processing:", JSON.stringify(req.session.scavenging.currentCombat));
+    
+    // Prepare response data
+    if (req.session.scavenging.currentCombat) {
+      // Combat is still ongoing
+      console.log("Combat continues, returning updated state");
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          combat: req.session.scavenging.currentCombat,
+          character: {
+            name: character.name,
+            health: character.health
+          }
+        }
+      });
+    } else {
+      // Combat has ended
+      console.log("Combat has ended, returning ended state");
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          combat: { ended: true },
+          character: {
+            name: character.name,
+            health: character.health,
+            recoveryUntil: character.recoveryUntil
+          }
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error triggering combat round:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not process combat round',
+      error: error.message
+    });
+  }
+});
+
+// @desc    Force a combat encounter for testing
+// @route   POST /api/scavenge/force-combat/:monsterId
+// @access  Private
+exports.forceEncounter = asyncHandler(async (req, res) => {
+  try {
+    const { monsterId } = req.params;
+    
+    // Check if there's an active scavenging session
+    if (!req.session.scavenging) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active scavenging session'
+      });
+    }
+    
+    // Get character
     const character = await Character.findOne({ user: req.user.id });
     
     if (!character) {
@@ -730,45 +947,90 @@ exports.triggerCombatRound = asyncHandler(async (req, res) => {
       });
     }
     
-    // Store the current state for comparison
-    const prevMonsterHealth = req.session.scavenging.currentCombat.monster.currentHealth;
-    const prevPlayerHealth = character.health.current;
+    // Load locations data
+    const locationsPath = path.join(__dirname, '../public/js/scavenge_locations.json');
+    const locationsData = fs.readFileSync(locationsPath, 'utf8');
+    const locationsJson = JSON.parse(locationsData);
     
-    // Process a combat round
-    await processCombatRound(req, character);
+    // Find the current location
+    const location = locationsJson.locations.find(
+      loc => loc.id === req.session.scavenging.locationId
+    );
     
-    // Get updates after the combat round
-    const combat = req.session.scavenging.currentCombat;
-    
-    // Check if combat is still in progress
-    if (combat) {
-      // Calculate the damage dealt in this round for the UI
-      combat.newMonsterDamage = prevMonsterHealth - combat.monster.currentHealth;
-      combat.newPlayerDamage = prevPlayerHealth - character.health.current;
-      
-      return res.status(200).json({
-        success: true,
-        data: {
-          combat,
-          character
-        }
-      });
-    } else {
-      // Combat has ended
-      return res.status(200).json({
-        success: true,
-        data: {
-          combat: { ended: true },
-          character
-        }
+    if (!location) {
+      return res.status(404).json({
+        success: false,
+        message: 'Scavenge location not found'
       });
     }
     
+    // Find the specified monster in the location
+    let monsterEncounter;
+    for (const encounter of location.encounters) {
+      if (encounter.type === 'monster' && encounter.id === monsterId) {
+        monsterEncounter = encounter;
+        break;
+      }
+    }
+    
+    // If monster not found, find any monster
+    if (!monsterEncounter) {
+      for (const encounter of location.encounters) {
+        if (encounter.type === 'monster') {
+          monsterEncounter = encounter;
+          break;
+        }
+      }
+    }
+    
+    if (!monsterEncounter) {
+      return res.status(404).json({
+        success: false,
+        message: 'No monsters available in this location'
+      });
+    }
+    
+    // Format the elapsed time for logs
+    const elapsedSeconds = Math.floor((Date.now() - req.session.scavenging.startTime) / 1000);
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Add log entry
+    req.session.scavenging.logs.push({
+      time: Date.now(),
+      message: `[${timeString}] You encountered a ${monsterEncounter.name}!`    });
+    
+    // Start combat
+    req.session.scavenging.currentCombat = {
+      monster: {
+        ...monsterEncounter,
+        currentHealth: monsterEncounter.health
+      },
+      rounds: 0,
+      lastRound: Date.now(),
+      playerDamage: 0,
+      monsterDamage: 0
+    };
+    
+    // Return success with combat data
+    res.status(200).json({
+      success: true,
+      message: `Started combat with ${monsterEncounter.name}`,
+      data: {
+        combat: req.session.scavenging.currentCombat,
+        character: {
+          name: character.name, 
+          health: character.health
+        }
+      }
+    });
+    
   } catch (error) {
-    console.error('Error triggering combat round:', error);
+    console.error('Error forcing combat encounter:', error);
     res.status(500).json({
       success: false,
-      message: 'Could not process combat round',
+      message: 'Could not force combat encounter',
       error: error.message
     });
   }

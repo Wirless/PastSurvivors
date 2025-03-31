@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       progressContainer.classList.add('event-imminent');
     } else {
       // Get the max time between events (we know it's between 5-15 seconds from the controller)
-      const maxTime = 6;
+      const maxTime = 15;
       // Calculate progress percentage (inverted - starts full and decreases)
       const progressPercent = 100 - ((seconds / maxTime) * 100);
       progressBar.style.width = `${progressPercent}%`;
@@ -729,378 +729,445 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Update combat display with current combat information
   function updateCombatDisplay(combat, characterHealth) {
     if (!combatWindow || !combat || !combat.monster) {
-        console.error("Missing required combat data", { combat, characterHealth });
-        return;
+      console.error("Missing required combat data", { combat, characterHealth });
+      return;
     }
     
     console.log("Updating combat display with data:", { combat, characterHealth });
     
-    // Show combat window
+    // Show combat window if hidden
     combatWindow.classList.remove('hidden');
     
     // Get the monster data
     const monster = combat.monster;
     
-    // Debug for monster data
-    console.log("Monster data:", monster);
-    
     // Update monster image
     if (monsterImage) {
-        if (monster.image) {
-            monsterImage.innerHTML = `<img src="${monster.image}" alt="${monster.name}">`;
-        } else {
-            monsterImage.innerHTML = `<div class="monster-placeholder">${monster.name}</div>`;
-        }
+      if (monster.image) {
+        monsterImage.innerHTML = `<img src="${monster.image}" alt="${monster.name}">`;
+      } else {
+        monsterImage.innerHTML = `<div class="monster-placeholder">${monster.name}</div>`;
+      }
     }
     
     // Update monster name and stats
     if (combatMonsterName) combatMonsterName.textContent = monster.name;
-    if (combatMonsterDamage) combatMonsterDamage.textContent = monster.damage || 0;
-    if (combatMonsterXP) combatMonsterXP.textContent = monster.experience || 0;
     
-    // Update monster health
+    // Update monster health with improved styling
     if (combatMonsterHealthBar && combatMonsterHealthValue) {
-        const monsterHealthPercent = (monster.currentHealth / monster.health) * 100;
-        combatMonsterHealthBar.style.width = `${Math.max(0, Math.min(100, monsterHealthPercent))}%`;
-        combatMonsterHealthValue.textContent = `${monster.currentHealth}/${monster.health}`;
+      const monsterHealthPercent = (monster.currentHealth / monster.health) * 100;
+      combatMonsterHealthBar.style.width = `${Math.max(0, Math.min(100, monsterHealthPercent))}%`;
+      combatMonsterHealthValue.innerHTML = `
+        <span class="health-text">${monster.currentHealth}/${monster.health}</span>
+      `;
+      
+      // Set health bar color based on percentage
+      if (monsterHealthPercent < 25) {
+        combatMonsterHealthBar.style.background = 'linear-gradient(to right, #ff0000, #ff3333)';
+      } else if (monsterHealthPercent < 50) {
+        combatMonsterHealthBar.style.background = 'linear-gradient(to right, #ff5500, #ff7733)';
+      } else {
+        combatMonsterHealthBar.style.background = 'linear-gradient(to right, #ff5555, #f14f5c)';
+      }
     }
     
-    // Update player health (with proper null checks)
+    // Update player health with improved styling
     if (combatPlayerHealthBar && combatPlayerHealthValue) {
-        let current, max;
-        
-        // Handle different character data structures
-        if (characterHealth && characterHealth.health) {
-            current = characterHealth.health.current;
-            max = characterHealth.health.max;
-        } else if (characterHealth) {
-            current = characterHealth.current;
-            max = characterHealth.max;
-        } else {
-            // Default fallback values
-            current = 0;
-            max = 100;
-        }
-        
-        // Ensure we have valid numbers
-        current = Number(current) || 0;
-        max = Number(max) || 100;
-        
-        const playerHealthPercent = (current / max) * 100;
-        combatPlayerHealthBar.style.width = `${Math.max(0, Math.min(100, playerHealthPercent))}%`;
-        combatPlayerHealthValue.textContent = `${current}/${max}`;
+      let current, max;
+      
+      // Handle different character data structures
+      if (characterHealth && characterHealth.health) {
+        current = characterHealth.health.current;
+        max = characterHealth.health.max;
+      } else if (characterHealth) {
+        current = characterHealth.current;
+        max = characterHealth.max;
+      } else {
+        // Default fallback values
+        current = 0;
+        max = 100;
+      }
+      
+      // Ensure we have valid numbers
+      current = Number(current) || 0;
+      max = Number(max) || 100;
+      
+      const playerHealthPercent = (current / max) * 100;
+      combatPlayerHealthBar.style.width = `${Math.max(0, Math.min(100, playerHealthPercent))}%`;
+      combatPlayerHealthValue.innerHTML = `
+        <span class="health-text">${current}/${max}</span>
+      `;
+      
+      // Set health bar color based on percentage
+      if (playerHealthPercent < 25) {
+        combatPlayerHealthBar.style.background = 'linear-gradient(to right, #ff0000, #ff3333)';
+      } else if (playerHealthPercent < 50) {
+        combatPlayerHealthBar.style.background = 'linear-gradient(to right, #ff5500, #ff7733)';
+      } else {
+        combatPlayerHealthBar.style.background = 'linear-gradient(to right, #55ff55, #33ff33)';
+      }
     }
     
-    // Update combat round and damage info
-    if (combatRoundCount) combatRoundCount.textContent = combat.rounds || 0;
-    if (combatPlayerDamage) combatPlayerDamage.textContent = combat.playerDamage || 0;
-    if (combatMonsterDamageDealt) combatMonsterDamageDealt.textContent = combat.monsterDamage || 0;
+    // Create or update combat stats container
+    const statsContainer = document.querySelector('.combat-stats-container') || document.createElement('div');
+    if (!statsContainer.classList.contains('combat-stats-container')) {
+      statsContainer.classList.add('combat-stats-container');
+      // Find where to insert the stats container (after monster name/before combat log)
+      const insertPoint = combatMonsterName ? combatMonsterName.parentNode : combatWindow;
+      insertPoint.appendChild(statsContainer);
+    }
+    
+    // Update combat stats in the container
+    statsContainer.innerHTML = `
+      <div class="combat-stat">
+        <span class="combat-stat-label">Round:</span>
+        <span class="combat-stat-value">${combat.rounds || 0}</span>
+      </div>
+      <div class="combat-stat">
+        <span class="combat-stat-label">Your Damage:</span>
+        <span class="combat-stat-value">${combat.playerDamage || 0}</span>
+      </div>
+      <div class="combat-stat">
+        <span class="combat-stat-label">Monster Damage:</span>
+        <span class="combat-stat-value">${combat.monsterDamage || 0}</span>
+      </div>
+      <div class="combat-stat">
+        <span class="combat-stat-label">XP Reward:</span>
+        <span class="combat-stat-value">${monster.experience || 0}</span>
+      </div>
+    `;
     
     // Add combat log entries for new damage
     if (combat.newPlayerDamage && combat.newPlayerDamage > 0) {
-        addCombatLogEntry(`${monster.name} attacks you for ${combat.newPlayerDamage} damage!`);
+      addCombatLogEntry(`${monster.name} attacks you for ${combat.newPlayerDamage} damage!`);
     }
     
     if (combat.newMonsterDamage && combat.newMonsterDamage > 0) {
-        addCombatLogEntry(`You attack ${monster.name} for ${combat.newMonsterDamage} damage!`);
+      addCombatLogEntry(`You attack ${monster.name} for ${combat.newMonsterDamage} damage!`);
     }
     
     // Check for combat victory or defeat
     if (monster.currentHealth <= 0) {
-        addCombatLogEntry(`You defeated the ${monster.name}!`);
+      addCombatLogEntry(`You defeated the ${monster.name}!`);
     } else if (characterHealth) {
-        // Check if health is in character.health or directly on character
-        const currentHealth = characterHealth.health ? characterHealth.health.current : characterHealth.current;
-        if (currentHealth !== undefined && currentHealth <= 0) {
-            addCombatLogEntry(`You were defeated by the ${monster.name}! Starting recovery...`);
-        }
+      // Check if health is in character.health or directly on character
+      const currentHealth = characterHealth.health ? characterHealth.health.current : characterHealth.current;
+      if (currentHealth !== undefined && currentHealth <= 0) {
+        addCombatLogEntry(`You were defeated by the ${monster.name}! Starting recovery...`);
+      }
     }
   }
   
   // Start combat mode and show the combat window
   function startCombat(combat, characterHealth) {
-    if (!combatWindow || !combat || !combat.monster) return;
+    if (!combatWindow || !combat || !combat.monster) {
+      console.error("Cannot start combat - missing required data", { combatWindow, combat });
+      return;
+    }
     
-    console.log("Starting combat with monster:", combat.monster);
+    console.log("Starting combat with monster:", combat.monster.name);
     
-    // Set combat flag to block any scavenging updates
+    // Set combat flag
     isInCombat = true;
     
-    // Pause scavenging updates while in combat
-    if (scavengeInterval) {
+    try {
+      // Clear any existing intervals and timers to avoid conflicts
+      // Only clear scavenging intervals, not combat timers
+      if (scavengeInterval) {
         clearInterval(scavengeInterval);
         scavengeInterval = null;
-    }
-    
-    // Store the scavenge start time to resume elapsed time calculation later
-    const storedStartTime = scavengeStartTime;
-    const pauseTime = Date.now();
-    
-    // Clear all existing intervals
-    if (window.elapsedTimerInterval) {
+      }
+      
+      if (window.elapsedTimerInterval) {
         clearInterval(window.elapsedTimerInterval);
         window.elapsedTimerInterval = null;
+      }
+      
+      // Update UI to show combat mode
+      updateCombatUI(true);
+      
+      // Initialize combat display
+      console.log("Initializing combat display");
+      showCombatWindow(combat, characterHealth);
+      
+      // Immediately trigger the first combat round with minimal delay
+      console.log("Scheduling immediate first combat round");
+      triggerCombatRound();
+    } catch (error) {
+      console.error("Error in startCombat:", error);
     }
-    
-    if (window.combatRoundTimeout) {
-        clearInterval(window.combatRoundTimeout);
-        window.combatRoundTimeout = null;
-    }
-    
-    // Make the scavenging section visually indicate combat is in progress
+  }
+
+  // Update UI for combat mode
+  function updateCombatUI(isCombatActive) {
+    // Apply styles to combat section
     if (scavengeSection) {
+      if (isCombatActive) {
         scavengeSection.classList.add('combat-active');
+      } else {
+        scavengeSection.classList.remove('combat-active');
+      }
     }
     
-    // Hide next event countdown during combat
+    // Handle next event countdown visibility
     if (nextEventProgress && nextEventProgress.parentElement) {
-        nextEventProgress.parentElement.style.display = 'none';
+      nextEventProgress.parentElement.style.display = isCombatActive ? 'none' : '';
     }
-    
+  }
+
+  // Show and initialize the combat window
+  function showCombatWindow(combat, characterHealth) {
     // Apply styling to combat window
-    combatWindow.style.zIndex = "100";
-    combatWindow.style.position = "relative";
-    combatWindow.style.backgroundColor = "#1c1c24";
-    combatWindow.style.border = "2px solid #ff5555";
-    combatWindow.style.borderRadius = "8px";
-    combatWindow.style.padding = "20px";
-    combatWindow.style.marginBottom = "30px";
-    combatWindow.style.boxShadow = "0 0 15px rgba(255, 85, 85, 0.4)";
+    styleElementForCombat(combatWindow);
     
     // Show combat window
     combatWindow.classList.remove('hidden');
     
-    // Set player name from character data
-    if (playerName) {
-        const charName = characterHealth && characterHealth.name ? characterHealth.name : 'Player';
-        playerName.textContent = charName;
+    // Set player name
+    if (playerName && characterHealth) {
+      const charName = characterHealth.name || 'Player';
+      playerName.textContent = charName;
     }
     
-    // Add a flashing effect
+    // Create the flashing effect to get user's attention
     combatWindow.classList.add('combat-flash');
     setTimeout(() => {
-        combatWindow.classList.remove('combat-flash');
-    }, 500);
+      combatWindow.classList.remove('combat-flash');
+    }, 3000); // Longer flash duration
     
-    // Clear combat log
+    // Clear and initialize combat log
     if (combatLogContainer) {
-        combatLogContainer.innerHTML = '';
+      combatLogContainer.innerHTML = '';
+      addCombatLogEntry(`⚔️ COMBAT STARTED! ⚔️ You encounter a ${combat.monster.name}!`);
+      addCombatLogEntry(`Ready your weapon! Combat rounds will occur every 2 seconds.`);
+      addCombatLogEntry(`Your strength bonus: +${characterHealth.stats?.strength || '?'} damage`);
     }
     
-    // Add initial combat message
-    addCombatLogEntry(`Combat started! You encounter a ${combat.monster.name}!`);
+    // Make sure combat window is visible to the user
+    setTimeout(() => {
+      combatWindow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
     
-    // Scroll to combat window
-    combatWindow.scrollIntoView({ behavior: 'smooth' });
-    
-    // Update the combat display
+    // Update the combat display with initial data
     updateCombatDisplay(combat, characterHealth);
     
-    // Start the first round manually after a short delay
-    setTimeout(() => {
-        // Force start the first combat round
-        triggerCombatRound().then(success => {
-            if (success && isInCombat) {
-                // Start the timer for the next round
-                startCombatRoundTimer();
-            }
-        });
-    }, 500);
+    // Add a warning message at the top of the combat window
+    const warningMsg = document.createElement('div');
+    warningMsg.className = 'combat-warning';
+    warningMsg.innerHTML = `
+      <span class="combat-alert">⚠️ COMBAT IN PROGRESS ⚠️</span>
+      <p>Scavenging is paused until combat resolves</p>
+    `;
+    warningMsg.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
+    warningMsg.style.color = '#ff9999';
+    warningMsg.style.padding = '10px';
+    warningMsg.style.marginBottom = '15px';
+    warningMsg.style.borderRadius = '5px';
+    warningMsg.style.textAlign = 'center';
+    warningMsg.style.fontWeight = 'bold';
+    
+    combatWindow.insertBefore(warningMsg, combatWindow.firstChild);
   }
 
-  // Add a new function to handle combat round timing
-  function startCombatRoundTimer() {
+  // Helper function to clear all intervals and timers
+  function clearAllIntervals() {
+    // Clear scavenging interval
+    if (scavengeInterval) {
+      clearInterval(scavengeInterval);
+      scavengeInterval = null;
+    }
+    
+    // Clear elapsed timer interval
+    if (window.elapsedTimerInterval) {
+      clearInterval(window.elapsedTimerInterval);
+      window.elapsedTimerInterval = null;
+    }
+    
+    // Clear combat round timeout
+    if (window.combatRoundTimeout) {
+      clearTimeout(window.combatRoundTimeout);
+      window.combatRoundTimeout = null;
+    }
+    
+    // Clear combat interval
+    if (combatIntervalId) {
+      clearInterval(combatIntervalId);
+      combatIntervalId = null;
+    }
+  }
+
+  // Style element for combat
+  function styleElementForCombat(element) {
+    element.style.zIndex = "1000";  // Higher z-index
+    element.style.position = "relative";
+    element.style.backgroundColor = "#1c1c24";
+    element.style.border = "5px solid #ff5555"; // Thicker border
+    element.style.borderRadius = "8px";
+    element.style.padding = "20px";
+    element.style.marginBottom = "30px";
+    element.style.boxShadow = "0 0 30px rgba(255, 85, 85, 0.8)"; // Brighter glow
+    element.style.transition = "all 0.3s ease";
+    element.style.transform = "translateY(0)";
+    element.style.animation = "combat-bounce 0.5s ease";
+    
+    // Add animation keyframe if it doesn't exist
+    if (!document.getElementById('combat-bounce-keyframes')) {
+      const bounceKeyframes = document.createElement('style');
+      bounceKeyframes.id = 'combat-bounce-keyframes';
+      bounceKeyframes.textContent = `
+        @keyframes combat-bounce {
+          0% { transform: translateY(-20px); opacity: 0; }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+      `;
+      document.head.appendChild(bounceKeyframes);
+    }
+  }
+
+  // Start the first combat round
+  function startFirstCombatRound() {
     if (!isInCombat) return;
     
-    console.log("Starting combat round timer");
+    console.log("Starting first combat round immediately");
+    
+    // Skip status check and directly trigger the round
+    triggerCombatRound();
+  }
+
+  // Trigger a combat round with the server
+  async function triggerCombatRound() {
+    if (!isInCombat) {
+      console.error("Not in combat, can't trigger round");
+      return;
+    }
+    
+    console.log("Attempting to trigger combat round...");
     
     // Clear any existing timer
     if (window.combatRoundTimeout) {
-        clearInterval(window.combatRoundTimeout);
-        window.combatRoundTimeout = null;
+      clearTimeout(window.combatRoundTimeout);
+      window.combatRoundTimeout = null;
     }
-    
-    // Set initial timer state - fixed 2 second interval
-    let secondsLeft = 2;
-    
-    // Update timer display
-    if (combatRoundTimer) {
-        combatRoundTimer.textContent = `${secondsLeft}s`;
-        combatRoundTimer.classList.remove('pulse');
-    }
-    
-    // Start the countdown
-    window.combatRoundTimeout = setInterval(() => {
-        secondsLeft--;
-        
-        // Update timer display
-        if (combatRoundTimer) {
-            if (secondsLeft <= 0) {
-                combatRoundTimer.textContent = 'Next';
-                combatRoundTimer.classList.add('pulse');
-                
-                // Clear interval before triggering next round
-                clearInterval(window.combatRoundTimeout);
-                window.combatRoundTimeout = null;
-                
-                // Trigger the next round
-                triggerCombatRound().then(success => {
-                    if (success && isInCombat) {
-                        // Only start a new timer if combat is still active
-                        startCombatRoundTimer();
-                    }
-                });
-            } else {
-                combatRoundTimer.textContent = `${secondsLeft}s`;
-                combatRoundTimer.classList.remove('pulse');
-            }
-        }
-    }, 1000);
-  }
-  
-  // Update the triggerCombatRound function to handle the response properly
-  async function triggerCombatRound() {
-    if (!isInCombat) return false;
-    
-    console.log("Triggering combat round");
     
     try {
-        const response = await fetch('/api/scavenge/combat-round', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const data = await response.json();
-        console.log("Combat round response:", data);
-        
-        if (data.success) {
-            // Check if combat has ended
-            if (!data.data.combat || data.data.combat.ended) {
-                console.log("Combat has ended");
-                isInCombat = false;
-                endCombat(data.data.character);
-                return false;
-            } else {
-                // Update the combat display with new data
-                updateCombatDisplay(data.data.combat, data.data.character);
-                return true;
-            }
-        } else {
-            console.error('Combat round failed:', data.message);
-            updateCombatStatus(); // Try to update status
-            return false;
+      console.log("Sending combat round POST request");
+      const response = await fetch('/api/scavenge/combat-round', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
         }
-    } catch (error) {
-        console.error('Error triggering combat round:', error);
-        updateCombatStatus(); // Try to update status
-        return false;
-    }
-  }
-  
-  // Start recovery countdown after player death
-  function startRecoveryCountdown(recoveryEndDateTime) {
-    if (!combatRecoverySection || !recoveryProgress || !recoveryTime) return;
-    
-    // Store recovery end time
-    recoveryEndTime = recoveryEndDateTime;
-    
-    // Show recovery section
-    combatRecoverySection.classList.remove('hidden');
-    
-    // Clear any existing interval
-    if (recoveryInterval) {
-      clearInterval(recoveryInterval);
-    }
-    
-    // Update recovery progress and time
-    updateRecoveryCountdown();
-    
-    // Set interval to update countdown
-    recoveryInterval = setInterval(updateRecoveryCountdown, 1000);
-  }
-  
-  // Update recovery countdown timer
-  function updateRecoveryCountdown() {
-    if (!recoveryEndTime || !recoveryProgress || !recoveryTime) return;
-    
-    const now = new Date();
-    const timeDiff = recoveryEndTime - now;
-    
-    if (timeDiff <= 0) {
-      // Recovery complete
-      stopRecoveryCountdown();
-      showToast('Recovery complete! You can now continue scavenging.');
-      return;
-    }
-    
-    // Calculate progress percentage (inverted - starts at 0% and increases to 100%)
-    const totalRecoveryTime = 10 * 60 * 1000; // 10 minutes in milliseconds
-    const elapsedTime = totalRecoveryTime - timeDiff;
-    const progressPercent = (elapsedTime / totalRecoveryTime) * 100;
-    
-    // Update progress bar
-    recoveryProgress.style.width = `${Math.min(100, progressPercent)}%`;
-    
-    // Update time display
-    const minutesLeft = Math.floor(timeDiff / 60000);
-    const secondsLeft = Math.floor((timeDiff % 60000) / 1000);
-    recoveryTime.textContent = `${minutesLeft}:${secondsLeft.toString().padStart(2, '0')}`;
-  }
-  
-  // Stop recovery countdown
-  function stopRecoveryCountdown() {
-    if (!combatRecoverySection) return;
-    
-    // Hide recovery section
-    combatRecoverySection.classList.add('hidden');
-    
-    // Clear interval
-    if (recoveryInterval) {
-      clearInterval(recoveryInterval);
-      recoveryInterval = null;
-    }
-    
-    // Reset recovery end time
-    recoveryEndTime = null;
-  }
-  
-  // Add a message to the combat log
-  function addCombatLogEntry(message) {
-    if (!combatLogContainer) return;
-    
-    const now = new Date();
-    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-    
-    const logEntry = document.createElement('div');
-    logEntry.className = 'log-entry';
-    
-    // Add appropriate classes based on content
-    if (message.includes('defeated') || message.includes('success')) {
-      logEntry.classList.add('success');
-    } else if (message.includes('attacks you') || message.includes('damage')) {
-      logEntry.classList.add('danger');
-    }
-    
-    logEntry.innerHTML = `<span class="log-time">[${timeString}]</span> ${message}`;
-    combatLogContainer.appendChild(logEntry);
-    
-    // Scroll to the bottom of the log
-    combatLogContainer.scrollTop = combatLogContainer.scrollHeight;
-  }
-  
-  // Update the updateCombatStatus function to use consistent structure
-  function updateCombatStatus() {
-    if (!isInCombat) {
-      if (combatIntervalId) {
-        clearInterval(combatIntervalId);
-        combatIntervalId = null;
+      });
+      
+      if (!response.ok) {
+        console.error(`Server returned error status: ${response.status}`);
+        throw new Error(`Server returned ${response.status}`);
       }
+      
+      console.log("Combat round POST request successful, parsing response");
+      const data = await response.json();
+      console.log("Combat round full response:", data);
+      
+      if (data.success) {
+        // Check if combat has ended
+        if (!data.data.combat || data.data.combat.ended) {
+          console.log("Combat has ended in response");
+          isInCombat = false;
+          endCombat(data.data.character);
+          return;
+        }
+        
+        // Update the combat display with new data
+        console.log("Updating combat display with response data");
+        updateCombatDisplay(data.data.combat, data.data.character);
+        
+        // Schedule next round
+        console.log("Scheduling next round");
+        scheduleNextRound();
+      } else {
+        console.error('Combat round failed:', data.message);
+        // If we get an error, try to check status and maybe end combat
+        setTimeout(() => updateCombatStatus(), 1000);
+      }
+    } catch (error) {
+      console.error('Error triggering combat round:', error);
+      // If we get an error, try to check status and maybe end combat
+      setTimeout(() => updateCombatStatus(), 1000);
+    }
+  }
+
+  // Schedule the next combat round
+  function scheduleNextRound() {
+    if (!isInCombat) {
+      console.log("Not scheduling next round because combat ended");
       return;
     }
     
-    // Use the regular status endpoint since we don't have a dedicated combat endpoint
+    // Clear any existing intervals or timeouts first
+    if (window.combatRoundTimeout) {
+      clearTimeout(window.combatRoundTimeout);
+      window.combatRoundTimeout = null;
+    }
+    
+    if (window.currentCountdownInterval) {
+      clearInterval(window.currentCountdownInterval);
+      window.currentCountdownInterval = null;
+    }
+    
+    // Fixed 2 second delay between rounds
+    const roundDelay = 2000;
+    
+    console.log(`Scheduling next combat round in ${roundDelay}ms`);
+    
+    // Start the countdown display
+    startRoundCountdown(roundDelay / 1000);
+    
+    // Schedule the next round with a direct function call to triggerCombatRound
+    window.combatRoundTimeout = setTimeout(function() {
+      console.log("Timeout triggered for next combat round");
+      if (isInCombat) {
+        triggerCombatRound();
+      } else {
+        console.log("Combat ended before next round could start");
+      }
+    }, roundDelay);
+  }
+
+  // Show countdown for next round
+  function startRoundCountdown(seconds) {
+    if (!combatRoundTimer || !isInCombat) return;
+    
+    // Initial display
+    combatRoundTimer.textContent = `${Math.ceil(seconds)}s`;
+    combatRoundTimer.classList.remove('pulse');
+    
+    // Start a counter to update every 500ms for smoother countdown
+    let remainingTime = seconds;
+    const updateInterval = 500; // update every 500ms
+    
+    const countdownInterval = setInterval(() => {
+      remainingTime -= updateInterval / 1000;
+      
+      if (remainingTime <= 0) {
+        clearInterval(countdownInterval);
+        combatRoundTimer.textContent = 'Next';
+        combatRoundTimer.classList.add('pulse');
+        return;
+      }
+      
+      combatRoundTimer.textContent = `${Math.ceil(remainingTime)}s`;
+    }, updateInterval);
+    
+    // Clean up interval when next round starts
+    window.currentCountdownInterval = countdownInterval;
+  }
+
+  // Update the combat status manually
+  function updateCombatStatus() {
+    if (!isInCombat) return;
+    
+    console.log("Manually updating combat status");
+    
+    // Use the regular status endpoint to check combat status
     fetch('/api/scavenge/status')
       .then(response => response.json())
       .then(data => {
@@ -1111,25 +1178,68 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateCombatDisplay(data.data.currentCombat, characterData);
           } else {
             // Combat ended
+            console.log("Combat ended according to status check");
             isInCombat = false;
             endCombat(data.data.character || data.data.characterHealth);
-            
-            // Clear combat interval
-            if (combatIntervalId) {
-              clearInterval(combatIntervalId);
-              combatIntervalId = null;
-            }
-            
-            // Restart scavenge interval to resume normal scavenging
-            if (isScavenging && !scavengeInterval) {
-              scavengeInterval = setInterval(updateScavengeStatus, 1000);
-            }
           }
         }
       })
       .catch(error => {
         console.error('Error updating combat status:', error);
       });
+  }
+
+  // End combat and return to scavenging
+  function endCombat(character) {
+    if (!combatWindow) return;
+    
+    console.log("Ending combat");
+    
+    // Clear all combat timers
+    if (window.combatRoundTimeout) {
+      clearTimeout(window.combatRoundTimeout);
+      window.combatRoundTimeout = null;
+    }
+    
+    if (window.currentCountdownInterval) {
+      clearInterval(window.currentCountdownInterval);
+      window.currentCountdownInterval = null;
+    }
+    
+    // Add final combat message
+    addCombatLogEntry('Combat ended!');
+    
+    // After a delay, hide the combat window and restore scavenging
+    setTimeout(() => {
+      // Clear combat flag
+      isInCombat = false;
+      
+      // Hide combat window
+      combatWindow.classList.add('hidden');
+      
+      // Remove combat active styling from scavenging section
+      if (scavengeSection) {
+        scavengeSection.classList.remove('combat-active');
+      }
+      
+      // Show next event countdown again
+      if (nextEventProgress && nextEventProgress.parentElement) {
+        nextEventProgress.parentElement.style.display = '';
+      }
+      
+      // Restart scavenging updates if still scavenging
+      if (isScavenging) {
+        startScavengeInterval();
+      }
+      
+      // Check if player died and needs recovery
+      if (character && character.recoveryUntil) {
+        const recoveryDate = new Date(character.recoveryUntil);
+        if (recoveryDate > new Date()) {
+          startRecoveryCountdown(recoveryDate);
+        }
+      }
+    }, 2000);
   }
 
   // Add combat-flash animation style to document head
@@ -1141,22 +1251,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       styleElement.textContent = `
         @keyframes combat-flash {
           0% { box-shadow: 0 0 15px rgba(255, 85, 85, 0.4); }
-          50% { box-shadow: 0 0 25px rgba(255, 85, 85, 0.8); }
+          50% { box-shadow: 0 0 30px rgba(255, 85, 85, 0.9); }
           100% { box-shadow: 0 0 15px rgba(255, 85, 85, 0.4); }
         }
         
         .combat-flash {
-          animation: combat-flash 0.5s 3;
+          animation: combat-flash 0.5s 5; /* More flashes */
         }
         
         @keyframes pulse {
-          0% { color: #f1fa8c; }
-          50% { color: #ff5555; }
-          100% { color: #f1fa8c; }
+          0% { color: #f1fa8c; transform: scale(1); }
+          50% { color: #ff5555; transform: scale(1.1); }
+          100% { color: #f1fa8c; transform: scale(1); }
         }
         
         .pulse {
           animation: pulse 0.5s infinite;
+          display: inline-block;
+          font-weight: bold;
         }
         
         .combat-overlay {
@@ -1183,66 +1295,212 @@ document.addEventListener('DOMContentLoaded', async () => {
           border-radius: 5px;
           font-weight: bold;
           z-index: 10;
+          box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        
+        #combat-window {
+          transition: all 0.3s ease;
+        }
+        
+        #combat-round-timer {
+          font-weight: bold;
+          transition: all 0.2s ease;
+        }
+        
+        /* Health bar animations */
+        #combat-player-health-bar, #combat-monster-health-bar {
+          transition: width 0.5s ease-in-out;
+        }
+        
+        /* Combat stats positioning */
+        .combat-stats-container {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-top: 15px;
+          margin-bottom: 15px;
+        }
+        
+        .combat-stat {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 5px;
+          padding: 8px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        
+        .combat-stat-label {
+          font-weight: bold;
+          color: #f1fa8c;
+        }
+        
+        .combat-stat-value {
+          font-weight: bold;
+          color: #ff5555;
+        }
+        
+        /* Health bars */
+        .health-bar-container {
+          height: 24px;
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 12px;
+          margin: 10px 0;
+          position: relative;
+          overflow: hidden;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .health-bar {
+          height: 100%;
+          background: linear-gradient(to right, #ff5555, #f14f5c);
+          border-radius: 12px;
+          transition: width 0.5s ease;
+        }
+        
+        .health-text {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          color: white;
+          font-weight: bold;
+          text-shadow: 1px 1px 2px black;
+          z-index: 2;
         }
       `;
       document.head.appendChild(styleElement);
     }
   }
 
-  // Update the endCombat function to properly handle elapsed time
-  function endCombat(character) {
-    if (!combatWindow) return;
+  // Add a message to the combat log
+  function addCombatLogEntry(message) {
+    if (!combatLogContainer) return;
     
-    // Add final combat message
-    addCombatLogEntry('Combat ended!');
+    const now = new Date();
+    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
     
-    // Clear combat interval
-    if (combatIntervalId) {
-        clearInterval(combatIntervalId);
-        combatIntervalId = null;
+    const logEntry = document.createElement('div');
+    logEntry.className = 'log-entry';
+    
+    // Add appropriate classes based on content
+    if (message.includes('defeated') || message.includes('success')) {
+      logEntry.classList.add('success');
+    } else if (message.includes('attacks you') || message.includes('damage')) {
+      logEntry.classList.add('danger');
     }
     
-    // Clear combat round timer
-    if (window.combatRoundTimeout) {
-        clearInterval(window.combatRoundTimeout);
-        window.combatRoundTimeout = null;
-    }
+    logEntry.innerHTML = `<span class="log-time">[${timeString}]</span> ${message}`;
+    combatLogContainer.appendChild(logEntry);
     
-    // After a delay, hide the combat window and restore scavenging
-    setTimeout(() => {
-        // Clear combat flag
-        isInCombat = false;
-        
-        // Hide combat window
-        combatWindow.classList.add('hidden');
-        
-        // Clear combat log
-        if (combatLogContainer) {
-            combatLogContainer.innerHTML = '';
-        }
-        
-        // Remove combat active styling from scavenging section
-        if (scavengeSection) {
-            scavengeSection.classList.remove('combat-active');
-        }
-        
-        // Show next event countdown again
-        if (nextEventProgress && nextEventProgress.parentElement) {
-            nextEventProgress.parentElement.style.display = '';
-        }
-        
-        // Restart scavenging updates if still scavenging
-        if (isScavenging && !scavengeInterval) {
-            startScavengeInterval();
-        }
-    }, 2000);
+    // Scroll to the bottom of the log
+    combatLogContainer.scrollTop = combatLogContainer.scrollHeight;
+  }
+
+  // Add this after the DOM loaded event listener setup
+  function initCombatDebugTools() {
+    // Check if we're in development mode
+    const isDevMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     
-    // Check if player died and needs recovery
-    if (character && character.recoveryUntil) {
-        const recoveryDate = new Date(character.recoveryUntil);
-        if (recoveryDate > new Date()) {
-            startRecoveryCountdown(recoveryDate);
+    if (isDevMode) {
+      // Create a debug button container
+      const debugContainer = document.createElement('div');
+      debugContainer.style.position = 'fixed';
+      debugContainer.style.bottom = '10px';
+      debugContainer.style.right = '10px';
+      debugContainer.style.zIndex = '9999';
+      debugContainer.style.padding = '10px';
+      debugContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+      debugContainer.style.borderRadius = '5px';
+      
+      // Add a button to force combat
+      const debugButton = document.createElement('button');
+      debugButton.textContent = 'Force Combat Round';
+      debugButton.style.padding = '5px 10px';
+      debugButton.style.marginRight = '5px';
+      debugButton.style.backgroundColor = '#ff5555';
+      debugButton.style.color = 'white';
+      debugButton.style.border = 'none';
+      debugButton.style.borderRadius = '3px';
+      debugButton.style.cursor = 'pointer';
+      
+      debugButton.addEventListener('click', () => {
+        console.log('Manual combat round triggered');
+        if (isInCombat) {
+          triggerCombatRound();
+        } else {
+          // Try to force a combat encounter
+          fetch('/api/scavenge/force-combat/any', {
+            method: 'POST'
+          })
+          .then(r => r.json())
+          .then(data => {
+            console.log('Force combat response:', data);
+            if (data.success) {
+              isInCombat = true;
+              startCombat(data.data.combat, data.data.character);
+            }
+          })
+          .catch(err => console.error('Error forcing combat:', err));
         }
+      });
+      
+      // Add a status check button
+      const statusButton = document.createElement('button');
+      statusButton.textContent = 'Check DOM Elements';
+      statusButton.style.padding = '5px 10px';
+      statusButton.style.backgroundColor = '#5555ff';
+      statusButton.style.color = 'white';
+      statusButton.style.border = 'none';
+      statusButton.style.borderRadius = '3px';
+      statusButton.style.cursor = 'pointer';
+      
+      statusButton.addEventListener('click', () => {
+        console.log('Checking combat DOM elements');
+        checkCombatDomElements();
+      });
+      
+      debugContainer.appendChild(debugButton);
+      debugContainer.appendChild(statusButton);
+      document.body.appendChild(debugContainer);
     }
   }
+
+  // Function to check if all combat DOM elements exist
+  function checkCombatDomElements() {
+    const elements = {
+      'Combat Window': combatWindow,
+      'Player Health Bar': combatPlayerHealthBar,
+      'Player Health Value': combatPlayerHealthValue,
+      'Monster Health Bar': combatMonsterHealthBar,
+      'Monster Health Value': combatMonsterHealthValue,
+      'Monster Name': combatMonsterName,
+      'Monster Damage': combatMonsterDamage,
+      'Monster XP': combatMonsterXP,
+      'Round Count': combatRoundCount,
+      'Player Damage': combatPlayerDamage,
+      'Monster Damage Dealt': combatMonsterDamageDealt,
+      'Round Timer': combatRoundTimer,
+      'Combat Log': combatLogContainer,
+      'Player Name': playerName,
+      'Monster Image': monsterImage
+    };
+    
+    console.group('Combat DOM Elements Check');
+    let allElementsExist = true;
+    
+    for (const [name, element] of Object.entries(elements)) {
+      const exists = !!element;
+      console.log(`${name}: ${exists ? 'Found ✓' : 'Missing ✗'}`);
+      if (!exists) allElementsExist = false;
+    }
+    
+    console.log(`Overall Status: ${allElementsExist ? 'All elements found ✓' : 'Missing elements detected ✗'}`);
+    console.groupEnd();
+    
+    return allElementsExist;
+  }
+
+  // Initialize debug tools after page load
+  initCombatDebugTools();
 }); 
